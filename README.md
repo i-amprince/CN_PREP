@@ -1,6 +1,6 @@
 # CN Prep: Computer Networks, one packet at a time
 
-**Live site:** https://i-amprince.github.io/CN_PREP/
+**Live site:** https://cn-prep.vercel.app/
 
 ## Why I built this
 
@@ -49,7 +49,7 @@ double-check.
 ## Tech
 
 React + Vite, plain JavaScript, no backend. Progress and quiz scores are saved in the browser's
-localStorage. Deployed on GitHub Pages through GitHub Actions.
+localStorage. Deployed on Vercel.
 
 ## Run it locally
 
