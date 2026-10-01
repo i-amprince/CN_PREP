@@ -1,0 +1,291 @@
+
+<!-- ================= CH: DNS / DHCP ================= -->
+<article class="ch" data-ch="dns" hidden>
+<div class="pane notes">
+<p>The Application layer is where the protocols apps actually use live. Starting with DNS + DHCP, because they explain how a device gets an address and finds a server.</p>
+<section><h2 id="dns-what"><span class="num">13.1</span>DNS: Domain Name System</h2>
+<p>Humans prefer <code>google.com</code>; computers communicate using <code>142.x.x.x</code>. DNS maps <strong>domain name → IP address</strong> (name resolution). Think of it as the Internet's <strong>distributed, hierarchical phonebook</strong>.</p>
+<p><strong>Transport</strong>: DNS commonly uses <strong>UDP port 53</strong>; it also uses <strong>TCP port 53</strong> for zone transfers and for responses too large for UDP (and when the truncation flag is set). Don't say "DNS = UDP only".</p>
+<p><span class="add">+ Added</span> Modern encrypted variants: <strong>DoT</strong> (DNS over TLS, port 853) and <strong>DoH</strong> (DNS over HTTPS, 443).</p>
+</section>
+
+<section><h2 id="dns-hier"><span class="num">13.2</span>Hierarchy and the resolution walk</h2>
+<ul class="tree"><li><span class="t">. (Root)</span> <em>13 root server identities, hundreds of anycast instances</em><ul><li><span class="t">.com</span> <em>TLD server</em><ul><li><span class="t">google.com</span> <em>authoritative server → A record</em></li></ul></li><li><span class="t">.org</span></li><li><span class="t">.in</span><ul><li>co.in · ac.in</li></ul></li></ul></li></ul>
+<ul><li><strong>Root servers</strong> know where the TLD servers are.</li><li><strong>TLD servers</strong> (.com, .org, .in, .edu) point to the authoritative server for the domain.</li><li><strong>Authoritative server</strong> holds the actual records: google.com → IP.</li><li><strong>Recursive resolver</strong> (your ISP's, 8.8.8.8, 1.1.1.1) does the walking for you and caches the answers.</li></ul>
+<div class="wg" data-wg="seq-dns"></div>
+<p>Cache order before any of this: <strong>browser cache → OS cache (and hosts file) → resolver cache → hierarchy</strong>.</p>
+</section>
+
+<section><h2 id="dns-rec"><span class="num">13.3</span>Recursive vs iterative queries</h2>
+<div class="vs"><div><h4>Recursive</h4>Client asks the resolver: "Give me the <strong>final answer</strong>." The resolver does all the work. (Your laptop → resolver.)</div><div><h4>Iterative</h4>The server replies with the best it has: "I don't know, but ask <em>this</em> server." The resolver follows the referrals. (Resolver → root → TLD → authoritative.)</div></div>
+</section>
+
+<section><h2 id="dns-cache"><span class="num">13.4</span>Caching and TTL</h2>
+<p>If you visited google.com recently, its IP may be cached → cache hit → no lookup. Every DNS record has a <strong>TTL in seconds</strong> that controls how long it may be cached. Don't confuse it with the IP packet TTL (hop count). <span class="add">+ Added</span> Low TTLs allow fast failover/migration; high TTLs reduce load. That is why DNS changes "take time to propagate".</p>
+</section>
+
+<section><h2 id="dns-records"><span class="num">13.5</span>Record types</h2>
+<div class="tbl"><table><thead><tr><th>Type</th><th>Maps</th><th>Example</th></tr></thead><tbody>
+<tr><td>A</td><td>Name → IPv4</td><td class="n">google.com → 142.250.x.x</td></tr>
+<tr><td>AAAA</td><td>Name → IPv6</td><td class="n">google.com → 2404:6800::…</td></tr>
+<tr><td>CNAME</td><td>Alias → another name</td><td class="n">www.example.com → example.com</td></tr>
+<tr><td>MX</td><td>Mail server for the domain (with priority)</td><td class="n">gmail.com → 5 gmail-smtp-in…</td></tr>
+<tr><td>NS</td><td>Authoritative name server</td><td class="n">example.com → ns1.example.com</td></tr>
+<tr><td>TXT</td><td>Free text: domain verification, SPF/DKIM/DMARC email policies</td><td class="n">"v=spf1 include:…"</td></tr>
+<tr><td>PTR <span class="add">+ Added</span></td><td>IP → name (reverse DNS, in-addr.arpa)</td><td class="n">8.8.8.8 → dns.google</td></tr>
+<tr><td>SOA <span class="add">+ Added</span></td><td>Start of authority: zone admin info, serial, timers</td><td></td></tr>
+<tr><td>SRV <span class="add">+ Added</span></td><td>Service location (host + port)</td><td class="n">_sip._tcp.example.com</td></tr>
+</tbody></table></div>
+<p><span class="add">+ Added</span> A CNAME can't coexist with other records at the same name (so not at the zone apex). <strong>DNS spoofing / cache poisoning</strong> injects fake answers into a resolver's cache; <strong>DNSSEC</strong> signs records to prevent it.</p>
+</section>
+
+<section><h2 id="dhcp"><span class="num">13.6</span>DHCP and DORA</h2>
+<p><strong>Dynamic Host Configuration Protocol</strong> automatically gives a device its network configuration: <strong>IP address, subnet mask, default gateway, DNS server</strong> (and a lease time). Without it you'd configure these manually.</p>
+<p>DHCP uses <strong>UDP: server port 67, client port 68</strong>.</p>
+<div class="wg" data-wg="seq-dhcp"></div>
+<p><strong>Why broadcast at first?</strong> The client has no IP address yet and doesn't know the DHCP server's IP, so it must shout on the local network (source 0.0.0.0, destination 255.255.255.255).</p>
+<div class="co added"><span class="lb">+ Added · leases and relays</span><ul><li>Addresses are <strong>leased</strong>. At <strong>T1 = 50%</strong> of the lease the client unicasts a renewal REQUEST to the same server; at <strong>T2 = 87.5%</strong> it broadcasts to any server.</li><li>The REQUEST is broadcast so other servers that sent OFFERs know they weren't chosen.</li><li><strong>DHCP relay agent</strong> (ip helper) on a router forwards broadcasts to a central DHCP server on another subnet.</li><li>DHCP RELEASE gives the address back; DECLINE says "that IP is already in use".</li><li>Attacks: <strong>rogue DHCP server</strong> (hands out a fake gateway) and <strong>DHCP starvation</strong>; defence = DHCP snooping on switches.</li></ul></div>
+<div class="tbl"><table><thead><tr><th>DNS</th><th>DHCP</th></tr></thead><tbody>
+<tr><td>Resolves names</td><td>Configures hosts</td></tr><tr><td>Domain → IP</td><td>Assigns IP + mask + gateway + DNS</td></tr><tr><td>UDP/TCP 53</td><td>UDP 67/68</td></tr><tr><td>"What IP belongs to this domain?"</td><td>"What network configuration should I use?"</td></tr></tbody></table></div>
+</section>
+
+<section><h2 id="app-other"><span class="num">13.7</span>Other application protocols</h2>
+<div class="tbl"><table><thead><tr><th>Protocol</th><th>Port</th><th>Purpose / notes</th></tr></thead><tbody>
+<tr><td>FTP</td><td class="n">21 control, 20 data</td><td>File transfer. Two connections ("out-of-band" control). <span class="add">+ Added</span> <strong>Active mode</strong>: server connects back to the client from port 20 (breaks behind NAT). <strong>Passive mode</strong>: client opens both connections. Credentials in plain text; use SFTP (over SSH) or FTPS.</td></tr>
+<tr><td>SSH</td><td class="n">22</td><td>Secure remote shell, encrypted. Also SFTP/SCP and port forwarding.</td></tr>
+<tr><td>Telnet <span class="add">+ Added</span></td><td class="n">23</td><td>Remote shell in plain text. Insecure; replaced by SSH.</td></tr>
+<tr><td>SMTP</td><td class="n">25 / 587 / 465</td><td>Sending email: client → server and server → server. 587 = submission with STARTTLS, 465 = implicit TLS.</td></tr>
+<tr><td>POP3 <span class="add">+ Added</span></td><td class="n">110 / 995</td><td>Receiving: downloads mail and (by default) deletes it from the server. One device.</td></tr>
+<tr><td>IMAP <span class="add">+ Added</span></td><td class="n">143 / 993</td><td>Receiving: mail stays on the server, folders sync across devices.</td></tr>
+<tr><td>SNMP <span class="add">+ Added</span></td><td class="n">UDP 161 / 162</td><td>Network device monitoring; 162 = traps.</td></tr>
+<tr><td>NTP <span class="add">+ Added</span></td><td class="n">UDP 123</td><td>Clock synchronisation.</td></tr>
+<tr><td>RDP <span class="add">+ Added</span></td><td class="n">3389</td><td>Windows remote desktop.</td></tr>
+</tbody></table></div>
+<p>Email flow: <strong>sender's client → (SMTP) → sender's mail server → (SMTP, found via MX record) → recipient's mail server → (IMAP/POP3) → recipient's client</strong>.</p>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>DNS</h4><ul><li>Name → IP, port 53, UDP (TCP too)</li><li>Root → TLD → Authoritative</li><li>Client→resolver recursive; resolver→servers iterative</li><li>DNS TTL = cache seconds</li></ul></div>
+<div><h4>Records</h4><ul><li>A IPv4 · AAAA IPv6 · CNAME alias</li><li>MX mail · NS name server · TXT text</li><li>PTR reverse · SOA zone info</li></ul></div>
+<div><h4>DHCP</h4><ul><li>UDP 67 server / 68 client</li><li>Discover → Offer → Request → ACK</li><li>Broadcast: no IP yet</li><li>Renew at 50%, rebind at 87.5%</li></ul></div>
+<div><h4>Ports</h4><ul><li>FTP 20/21 · SSH 22 · Telnet 23 · SMTP 25</li><li>POP3 110 · IMAP 143 · SNMP 161 · NTP 123</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: HTTP ================= -->
+<article class="ch" data-ch="http" hidden>
+<div class="pane notes">
+<p>Placement interviews go well beyond "GET vs POST". Here's the full picture.</p>
+<section><h2 id="http-model"><span class="num">14.1</span>Request–response model and message structure</h2>
+<p>HTTP: client sends a <strong>request</strong>, server returns a <strong>response</strong>. Default port <strong>80</strong> (HTTPS 443).</p>
+<div class="vs">
+<div><h4>Request</h4><pre class="dg" style="margin:.4rem 0"><b>POST /login HTTP/1.1</b>     <em>← method · path · version</em>
+Host: example.com           <em>← headers</em>
+Content-Type: application/json
+                            <em>← blank line</em>
+{"username":"abc","password":"xyz"}  <em>← body</em></pre></div>
+<div><h4>Response</h4><pre class="dg" style="margin:.4rem 0"><b>HTTP/1.1 200 OK</b>         <em>← version · status</em>
+Content-Type: text/html
+Content-Length: 1024
+
+&lt;html&gt;...&lt;/html&gt;</pre></div>
+</div>
+<p>Example JSON exchange: <code>GET /users/10</code> → <code>200 OK</code>, <code>{"id":10,"name":"Prince"}</code>.</p>
+</section>
+
+<section><h2 id="http-methods"><span class="num">14.2</span>Methods, safety and idempotency</h2>
+<div class="tbl"><table><thead><tr><th>Method</th><th>Purpose</th><th>Safe</th><th>Idempotent</th><th>Body</th></tr></thead><tbody>
+<tr><td>GET</td><td>Retrieve</td><td>✔</td><td>✔</td><td>No</td></tr>
+<tr><td>POST</td><td>Submit / create / process</td><td>✘</td><td>✘</td><td>Yes</td></tr>
+<tr><td>PUT</td><td>Replace whole resource (or create at known URL)</td><td>✘</td><td>✔</td><td>Yes</td></tr>
+<tr><td>PATCH</td><td>Partial update</td><td>✘</td><td>✘ (not guaranteed)</td><td>Yes</td></tr>
+<tr><td>DELETE</td><td>Delete</td><td>✘</td><td>✔</td><td>Optional</td></tr>
+<tr><td>HEAD <span class="add">+ Added</span></td><td>GET without body (check headers, size)</td><td>✔</td><td>✔</td><td>No</td></tr>
+<tr><td>OPTIONS <span class="add">+ Added</span></td><td>Which methods are allowed? (CORS preflight)</td><td>✔</td><td>✔</td><td>No</td></tr>
+</tbody></table></div>
+<p><strong>Safe</strong> = doesn't change server state. <strong>Idempotent</strong> = doing it once or 10 times leaves the same final state (DELETE twice: still deleted; the second may return 404, but the state is the same). POST twice creates two orders, which is why "Resubmit form?" warnings exist.</p>
+<h3>GET vs POST</h3>
+<div class="tbl"><table><thead><tr><th>GET</th><th>POST</th></tr></thead><tbody>
+<tr><td>Retrieve data</td><td>Submit / process data</td></tr><tr><td>Parameters in URL query string</td><td>Data in body</td></tr><tr><td>Safe, idempotent</td><td>Neither</td></tr><tr><td>Cacheable, bookmarkable, stays in history/logs</td><td>Usually not cached, not bookmarkable</td></tr><tr><td>URL length limits (~2–8 KB in practice)</td><td>Large bodies OK</td></tr></tbody></table></div>
+<div class="co trap"><span class="lb">Don't say "POST is secure and GET is insecure"</span><p>Both are plain text over HTTP and both are encrypted over HTTPS. <strong>TLS provides encryption, not the choice of method.</strong> GET parameters do leak into logs, history and Referer headers, so never put secrets in a URL.</p></div>
+</section>
+
+<section><h2 id="http-status"><span class="num">14.3</span>Status codes</h2>
+<div class="wg" data-wg="status"></div>
+<div class="co key"><span class="lb">401 vs 403</span><span class="fx">401 Unauthorized → "Who are you?" (authentication missing or failed)</span><span class="fx">403 Forbidden → "I know who you are, but you can't do this." (authorisation)</span></div>
+</section>
+
+<section><h2 id="http-state"><span class="num">14.4</span>HTTP is stateless: cookies, sessions, tokens</h2>
+<p>HTTP itself doesn't remember previous requests; each request is independent. But sites need login, carts and preferences, so we add state on top with <strong>cookies, sessions and tokens</strong>.</p>
+<h3>Cookies</h3>
+<p>Small data the browser stores per domain. Server sends <code>Set-Cookie: sessionId=abc123</code>; the browser sends <code>Cookie: sessionId=abc123</code> back on later requests to that site. Uses: session tracking, auth state, preferences, carts, analytics.</p>
+<h3>Session-based authentication</h3>
+<div class="flow"><span>Login: server verifies credentials</span><span>Server creates a session (data stored server-side)</span><span>Sends Session ID in a cookie</span><span>Later requests: browser sends cookie → server looks up session → identifies user</span></div>
+<p>The cookie may contain only the session ID; the actual data stays on the server.</p>
+<div class="vs"><div><h4>Cookie</h4>Stored on the <strong>client/browser</strong>. A transport mechanism.</div><div><h4>Session</h4><strong>Server-side</strong> state associated with a client (via the session ID).</div></div>
+<h3>JWT (JSON Web Token)</h3>
+<p><code>header.payload.signature</code> (each Base64URL-encoded), sent as <code>Authorization: Bearer &lt;token&gt;</code>. The server <strong>verifies the signature</strong> instead of storing a session per client, so it's <strong>stateless</strong> and scales across servers.</p>
+<div class="co trap"><span class="lb">Trap</span><p>A JWT is <strong>signed, not encrypted</strong> by default. Anyone can Base64-decode the payload, so never put secrets in it. <span class="add">+ Added</span> Downside: hard to revoke before expiry (use short expiry + refresh tokens, or a deny-list).</p></div>
+<h3>Cookie security attributes</h3>
+<ul><li><strong>Secure</strong>: only sent over HTTPS.</li><li><strong>HttpOnly</strong>: JavaScript can't read it via <code>document.cookie</code>, which reduces theft by XSS.</li><li><strong>SameSite</strong> (Strict / Lax / None): controls sending on cross-site requests, which mitigates CSRF.</li><li><span class="add">+ Added</span> <strong>Domain / Path / Expires / Max-Age</strong> scope and lifetime. No expiry = session cookie (deleted when the browser closes).</li></ul>
+</section>
+
+<section><h2 id="http-caching"><span class="num">14.5</span>HTTP caching <span class="add">+ Added</span></h2>
+<ul><li><code>Cache-Control: max-age=3600</code> fresh for an hour; <code>no-cache</code> = revalidate first; <code>no-store</code> = never store; <code>private</code>/<code>public</code>.</li><li><strong>Validation</strong>: server sends <code>ETag</code> or <code>Last-Modified</code>; browser later asks with <code>If-None-Match</code> / <code>If-Modified-Since</code>; if unchanged, server replies <strong>304 Not Modified</strong> with no body.</li><li>Caches exist in the browser, proxies and CDNs.</li></ul>
+</section>
+
+<section><h2 id="http-versions"><span class="num">14.6</span>Keep-alive and HTTP versions</h2>
+<p>A new TCP (and TLS) connection per request is expensive. <strong>Keep-alive / persistent connections</strong> reuse one connection for many requests.</p>
+<div class="tbl"><table><thead><tr><th></th><th>HTTP/1.0</th><th>HTTP/1.1</th><th>HTTP/2</th><th>HTTP/3</th></tr></thead><tbody>
+<tr><td>Transport</td><td>TCP</td><td>TCP</td><td>TCP (+TLS)</td><td>QUIC over UDP</td></tr>
+<tr><td>Connections</td><td>New per request</td><td>Persistent by default</td><td>One, multiplexed</td><td>One, multiplexed</td></tr>
+<tr><td>Framing</td><td>Text</td><td>Text</td><td>Binary frames</td><td>Binary frames</td></tr>
+<tr><td>Multiplexing</td><td>No</td><td>Limited (pipelining, rarely used)</td><td>Yes (streams)</td><td>Yes (independent streams)</td></tr>
+<tr><td>Header compression</td><td>No</td><td>No</td><td>HPACK</td><td>QPACK</td></tr>
+<tr><td>Other</td><td></td><td>Host header, chunked transfer encoding</td><td>Stream priority, server push (deprecated)</td><td>0/1-RTT setup, connection migration</td></tr>
+</tbody></table></div>
+<div class="co added"><span class="lb">+ Added · head-of-line blocking (why HTTP/3 exists)</span><p>HTTP/1.1: a slow response blocks the ones behind it on that connection, so browsers open ~6 connections per host. HTTP/2 fixes that at the HTTP layer by multiplexing streams, but all streams share one <strong>TCP</strong> byte stream, so a single lost TCP packet stalls every stream until it's retransmitted (<strong>TCP-level HOL blocking</strong>). HTTP/3 runs on <strong>QUIC</strong>, where each stream is delivered independently, so loss on one stream doesn't block others.</p></div>
+<p>Don't say "HTTP/3 is unreliable because it uses UDP": <strong>QUIC adds reliability, encryption (TLS 1.3 built in), stream multiplexing and faster setup on top of UDP</strong>.</p>
+</section>
+
+<section><h2 id="http-realtime"><span class="num">14.7</span>Real-time: polling, long polling, SSE, WebSockets <span class="add">+ Added</span></h2>
+<div class="tbl"><table><thead><tr><th>Technique</th><th>How</th><th>Direction</th></tr></thead><tbody>
+<tr><td>Short polling</td><td>Ask every N seconds</td><td>Client pulls; wasteful</td></tr><tr><td>Long polling</td><td>Server holds the request open until there's news</td><td>Pseudo-push</td></tr><tr><td>Server-Sent Events</td><td>One long HTTP response streaming events</td><td>Server → client only</td></tr><tr><td>WebSocket</td><td>HTTP <code>Upgrade</code> → <strong>101 Switching Protocols</strong> → persistent full-duplex channel over the same TCP connection (ws:// / wss://)</td><td>Both ways; chat, games, live trading</td></tr></tbody></table></div>
+<p><strong>REST</strong>: architectural style using resources (URLs), standard methods, stateless requests, representations (JSON). <strong>CORS</strong>: browsers block cross-origin JS requests unless the server allows them with <code>Access-Control-Allow-Origin</code>; non-simple requests trigger an OPTIONS preflight.</p>
+</section>
+
+<section><h2 id="http-vs"><span class="num">14.8</span>HTTP vs HTTPS</h2>
+<div class="tbl"><table><thead><tr><th>HTTP</th><th>HTTPS</th></tr></thead><tbody><tr><td>Plain HTTP</td><td>HTTP over TLS</td></tr><tr><td>Port 80</td><td>Port 443</td></tr><tr><td>No encryption</td><td>Encrypted with TLS</td></tr><tr><td>No server authentication</td><td>Server authenticated by certificate</td></tr></tbody></table></div>
+<p>HTTPS doesn't change HTTP's request/response model; it secures the channel. Order: <strong>DNS → TCP → TLS → HTTP</strong>.</p>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Methods</h4><ul><li>GET retrieve · POST create/process</li><li>PUT replace · PATCH partial · DELETE</li><li>Idempotent: GET PUT DELETE HEAD OPTIONS</li><li>Safe: GET HEAD OPTIONS</li></ul></div>
+<div><h4>Status</h4><ul><li>1xx info · 2xx ok · 3xx redirect · 4xx client · 5xx server</li><li>200 201 204 · 301 302 304</li><li>400 401 403 404 429 · 500 502 503 504</li></ul></div>
+<div><h4>State</h4><ul><li>HTTP stateless</li><li>Cookie client-side · session server-side</li><li>JWT signed not encrypted</li><li>Secure · HttpOnly · SameSite</li></ul></div>
+<div><h4>Versions</h4><ul><li>1.1 persistent + Host header</li><li>2 binary + multiplexing + HPACK</li><li>3 QUIC/UDP, no TCP HOL blocking</li><li>WebSocket: 101 Switching Protocols</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: TLS ================= -->
+<article class="ch" data-ch="tls" hidden>
+<div class="pane notes">
+<p>Connects HTTP + cryptography + networking + security. The question: <strong>how does HTTPS securely talk to a server?</strong></p>
+<section><h2 id="tls-goals"><span class="num">15.1</span>HTTPS = HTTP + TLS</h2>
+<p>TLS (Transport Layer Security, successor of SSL) sits between TCP and HTTP and provides:</p>
+<ul><li><strong>Confidentiality</strong>: others can't read the data (encryption).</li><li><strong>Integrity</strong>: modification is detected (MAC / AEAD).</li><li><strong>Authentication</strong>: the client can verify the server's identity (certificates).</li></ul>
+<p><span class="add">+ Added</span> SSL 2.0/3.0 and TLS 1.0/1.1 are deprecated; use TLS 1.2 or 1.3. Which OSI layer? Commonly placed at Presentation (encryption) or "between Transport and Application"; in TCP/IP it's part of the Application layer.</p>
+</section>
+
+<section><h2 id="tls-crypto"><span class="num">15.2</span>Symmetric vs asymmetric encryption</h2>
+<div class="vs">
+<div><h4>Symmetric</h4>Same secret key encrypts and decrypts.<ul><li>AES, ChaCha20</li><li>✔ Very fast</li><li>✘ How do both sides get the same key securely?</li></ul></div>
+<div><h4>Asymmetric</h4>Key pair: <strong>public</strong> (share freely) + <strong>private</strong> (keep secret).<ul><li>RSA, ECC</li><li>✔ No shared secret needed in advance</li><li>✘ Much slower</li></ul></div>
+</div>
+<div class="co key"><span class="lb">The core idea</span><div class="flow"><span>Asymmetric crypto → authenticate the server + establish keys securely</span><span>Symmetric session keys</span><span>Encrypt the actual HTTP data (fast)</span></div></div>
+<div class="co trap"><span class="lb">Interview trap</span><p><strong>Q: Does HTTPS encrypt data using the server's public key?</strong><br>Not the bulk application data. TLS uses public-key mechanisms for authentication and/or key establishment, then <strong>symmetric session keys</strong> because symmetric encryption is far more efficient.</p></div>
+</section>
+
+<section><h2 id="tls-cert"><span class="num">15.3</span>Certificates and Certificate Authorities</h2>
+<p>How does your browser know a public key really belongs to google.com? The server presents a <strong>digital certificate</strong> (X.509) containing: domain identity, public key, validity period, issuer, and the issuer's <strong>digital signature</strong>.</p>
+<p>A <strong>Certificate Authority (CA)</strong> is a trusted entity that signs certificates. Browsers/OSes ship a list of trusted root CAs.</p>
+<ul class="tree"><li><span class="t">Root CA</span> <em>self-signed, pre-installed in your OS/browser</em><ul><li><span class="t">Intermediate CA</span> <em>signed by root</em><ul><li><span class="t">Server certificate</span> <em>google.com, signed by intermediate</em></li></ul></li></ul></li></ul>
+<p>The browser validates the <strong>chain</strong>: each signature, validity dates, that the domain matches (SAN), and revocation (OCSP/CRL). Any failure → the red warning page.</p>
+</section>
+
+<section><h2 id="tls-hs"><span class="num">15.4</span>TLS 1.3 handshake</h2>
+<div class="wg" data-wg="seq-tls"></div>
+<p>Modern TLS versions (especially 1.3) don't map exactly to older ones. Understand the purpose rather than memorising obsolete packet sequences.</p>
+<div class="tbl"><table><thead><tr><th></th><th>TLS 1.2 <span class="add">+ Added</span></th><th>TLS 1.3</th></tr></thead><tbody>
+<tr><td>Handshake</td><td>2 RTT</td><td>1 RTT (0-RTT on resumption)</td></tr><tr><td>Key exchange</td><td>RSA or (EC)DHE</td><td>Only ephemeral (EC)DHE → forward secrecy always</td></tr><tr><td>Certificate</td><td>Sent in plain text</td><td>Encrypted</td></tr><tr><td>Cipher suites</td><td>Many, some weak</td><td>5, all AEAD (AES-GCM, ChaCha20-Poly1305)</td></tr></tbody></table></div>
+<p><span class="add">+ Added</span> <strong>SNI</strong> (Server Name Indication) in ClientHello tells the server which site you want, so one IP can host many HTTPS sites. 0-RTT data can be replayed, so it's only for idempotent requests.</p>
+</section>
+
+<section><h2 id="tls-dh"><span class="num">15.5</span>Diffie-Hellman and forward secrecy</h2>
+<p>Client has secret <em>a</em>, server has secret <em>b</em>. They exchange only public values (g^a and g^b), and each independently computes the <strong>same shared secret</strong> g^(ab). An eavesdropper who sees g^a and g^b can't feasibly compute it.</p>
+<div class="wg" data-wg="dh"></div>
+<p>Modern TLS uses <strong>ECDHE</strong> (Elliptic Curve Diffie-Hellman Ephemeral). <strong>Ephemeral</strong> = fresh keys per session. This gives <strong>forward secrecy</strong>: if the server's long-term private key leaks later, recorded past sessions still can't be decrypted, because their session keys never depended on that key.</p>
+</section>
+
+<section><h2 id="tls-auth"><span class="num">15.6</span>Authentication vs encryption, MITM</h2>
+<div class="vs"><div><h4>Certificate</h4>"Who am I talking to?" → authentication.</div><div><h4>Session key</h4>"How do we talk securely?" → symmetric encryption.</div></div>
+<p><strong>Man-in-the-Middle</strong>: an attacker sits between client and server (Client ↔ Attacker ↔ Server) and impersonates each side. Without authentication, DH alone can be MITM'd (attacker does DH with both). With TLS correctly validated, the attacker can't present a valid certificate for google.com signed by a trusted CA, so validation fails.</p>
+<p><span class="add">+ Added</span> <strong>HSTS</strong> header forces browsers to use HTTPS for a domain, defeating SSL-stripping attacks. <strong>Certificate pinning</strong> (in apps) accepts only specific keys.</p>
+</section>
+
+<section><h2 id="tls-hash"><span class="num">15.7</span>Hashing and digital signatures</h2>
+<div class="vs"><div><h4>Encryption</h4>Reversible with the right key. Plaintext ↔ ciphertext.</div><div><h4>Hashing</h4>One-way, fixed-size digest. SHA-256, SHA-3. Used for integrity, passwords (with salt), signatures. Not reversible.</div></div>
+<div class="flow"><span>Message</span><span>Hash it (SHA-256)</span><span>Sign the hash with the PRIVATE key → signature</span><span>Receiver verifies with the PUBLIC key + recomputed hash</span></div>
+<p>A digital signature gives <strong>authentication, integrity and non-repudiation</strong>. In certificates, the CA's signature is what makes the certificate trustworthy.</p>
+<div class="co key"><span class="lb">Key direction rules <span class="add">+ Added</span></span><span class="fx">Confidentiality → encrypt with RECEIVER's public key</span><span class="fx">Signature → sign with SENDER's private key, verify with sender's public key</span><span class="fx">HMAC → hash + shared secret key = integrity + authenticity (used in TLS records)</span></div>
+<p>If a private key is compromised, an attacker can impersonate that identity, so certificates get revoked.</p>
+</section>
+
+<section><h2 id="tls-flow"><span class="num">15.8</span>HTTPS complete flow</h2>
+<div class="flow"><span>User enters https://example.com</span><span>DNS → server IP</span><span>TCP 3-way handshake</span><span>TLS handshake: certificate validation + key establishment</span><span>Symmetric session keys</span><span>Encrypted HTTP request → server</span><span>Encrypted HTTP response → browser decrypts</span></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>TLS gives</h4><ul><li>Confidentiality · Integrity · Authentication</li><li>HTTPS = HTTP + TLS, port 443</li></ul></div>
+<div><h4>Crypto</h4><ul><li>Symmetric: same key, fast, AES</li><li>Asymmetric: public/private, RSA/ECC</li><li>Asymmetric for auth + key exchange; symmetric for data</li></ul></div>
+<div><h4>Certificates</h4><ul><li>Bind domain ↔ public key</li><li>Signed by CA; chain root → intermediate → server</li></ul></div>
+<div><h4>TLS 1.3</h4><ul><li>1-RTT, ECDHE only</li><li>Forward secrecy</li><li>SNI, HSTS</li></ul></div>
+<div><h4>Signatures</h4><ul><li>Sign with private, verify with public</li><li>Hashing ≠ encryption</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: SECURITY ================= -->
+<article class="ch" data-ch="security" hidden>
+<div class="pane notes">
+<div class="co added"><span class="lb">+ Added chapter</span><p>Your notes touch on SYN floods and MITM. Interviews (especially for backend/SDE roles) also ask about firewalls, proxies, load balancers, CDNs and common attacks. All of this is new.</p></div>
+<section><h2 id="sec-cia"><span class="num">16.1</span>CIA triad</h2>
+<div class="vs"><div><h4>Confidentiality</h4>Only authorised parties read data. Encryption, access control.</div><div><h4>Integrity</h4>Data isn't altered undetected. Hashes, MACs, signatures.</div><div><h4>Availability</h4>Service stays up. Redundancy, DDoS protection.</div></div>
+</section>
+
+<section><h2 id="sec-fw"><span class="num">16.2</span>Firewalls, IDS/IPS, DMZ</h2>
+<div class="tbl"><table><thead><tr><th>Type</th><th>Layer</th><th>Looks at</th></tr></thead><tbody>
+<tr><td>Packet filter (stateless)</td><td>3–4</td><td>Each packet alone: IPs, ports, protocol (ACL rules)</td></tr>
+<tr><td>Stateful firewall</td><td>3–4</td><td>Tracks connections; allows replies to outbound traffic automatically</td></tr>
+<tr><td>Application firewall / WAF</td><td>7</td><td>HTTP content: SQL injection, XSS patterns</td></tr>
+<tr><td>Next-gen firewall</td><td>3–7</td><td>Stateful + deep packet inspection + app awareness + IPS</td></tr>
+</tbody></table></div>
+<ul><li><strong>IDS</strong> (Intrusion Detection System) detects and alerts (passive). <strong>IPS</strong> sits inline and blocks.</li><li><strong>DMZ</strong>: a separate network segment for public-facing servers (web, mail) between the Internet and the internal LAN.</li></ul>
+</section>
+
+<section><h2 id="sec-proxy"><span class="num">16.3</span>Proxy, reverse proxy, load balancer, CDN</h2>
+<div class="wg" data-wg="proxy"></div>
+<div class="vs"><div><h4>Forward proxy</h4>Acts for <strong>clients</strong>. The server sees the proxy, not you. Uses: content filtering, caching, bypassing geo-blocks, corporate egress control.</div><div><h4>Reverse proxy</h4>Acts for <strong>servers</strong>. Clients see one endpoint. Uses: load balancing, TLS termination, caching, compression, hiding backends (Nginx, HAProxy).</div></div>
+<h3>Load balancer</h3>
+<ul><li><strong>L4</strong> balances by IP/port (fast, can't see URLs). <strong>L7</strong> reads HTTP: route by path/host/cookie, sticky sessions.</li><li>Algorithms: <strong>round robin</strong>, weighted round robin, <strong>least connections</strong>, <strong>IP hash</strong> (same client → same server), least response time.</li><li>Health checks remove dead servers from the pool.</li></ul>
+<h3>CDN (Content Delivery Network)</h3>
+<p>Caches content at <strong>edge servers</strong> close to users (often reached via DNS or anycast). Lower latency, less origin load, absorbs DDoS. Examples: Cloudflare, Akamai, CloudFront.</p>
+</section>
+
+<section><h2 id="sec-attacks"><span class="num">16.4</span>Common network attacks</h2>
+<div class="tbl"><table><thead><tr><th>Attack</th><th>Layer</th><th>What happens</th><th>Defence</th></tr></thead><tbody>
+<tr><td>DoS / DDoS</td><td>3–7</td><td>Flood a target so real users can't reach it; DDoS uses many machines (botnet)</td><td>Rate limiting, CDN/scrubbing, anycast</td></tr>
+<tr><td>SYN flood</td><td>4</td><td>Half-open connections fill the backlog</td><td>SYN cookies</td></tr>
+<tr><td>ARP spoofing</td><td>2</td><td>Fake ARP replies → traffic goes via attacker</td><td>Dynamic ARP Inspection, static ARP</td></tr>
+<tr><td>MAC flooding</td><td>2</td><td>Fill switch CAM table → switch floods like a hub</td><td>Port security</td></tr>
+<tr><td>DNS spoofing / cache poisoning</td><td>7</td><td>Fake DNS answers send users to a malicious IP</td><td>DNSSEC, DoH/DoT</td></tr>
+<tr><td>IP spoofing</td><td>3</td><td>Forged source IP (for reflection/amplification)</td><td>Ingress filtering (BCP 38)</td></tr>
+<tr><td>MITM</td><td>any</td><td>Intercept/alter traffic between two parties</td><td>TLS with certificate validation, HSTS</td></tr>
+<tr><td>Smurf / amplification</td><td>3/7</td><td>Small spoofed request → big response sent to victim (DNS, NTP)</td><td>Disable open resolvers, rate limit</td></tr>
+<tr><td>Session hijacking / XSS / CSRF</td><td>7</td><td>Steal or ride a user's session cookie</td><td>HttpOnly, Secure, SameSite, CSRF tokens</td></tr>
+</tbody></table></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Firewalls</h4><ul><li>Stateless filter → per packet</li><li>Stateful → tracks connections</li><li>WAF → L7 HTTP</li><li>IDS detects, IPS blocks</li></ul></div>
+<div><h4>Middleboxes</h4><ul><li>Forward proxy → for clients</li><li>Reverse proxy → for servers</li><li>LB: L4 vs L7; round robin, least conn, IP hash</li><li>CDN → edge caching</li></ul></div>
+<div><h4>Attacks</h4><ul><li>SYN flood → SYN cookies</li><li>ARP spoof → DAI</li><li>DNS poison → DNSSEC</li><li>MITM → TLS + HSTS</li></ul></div>
+</div>
+</div>
+</article>

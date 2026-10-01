@@ -1,0 +1,288 @@
+
+<!-- ================= CH: WIRELESS ================= -->
+<article class="ch" data-ch="wireless" hidden>
+<div class="pane notes">
+<p>Now the important Wi-Fi concepts. Most of the access-control ideas were introduced in the <a href="#/ch/access">Medium access</a> chapter; here they come together for wireless LANs.</p>
+<section><h2 id="wl-80211"><span class="num">17.1</span>IEEE 802.11: where Wi-Fi sits</h2>
+<p>Wireless LAN is commonly based on <strong>IEEE 802.11</strong>. Wi-Fi operates primarily at the <strong>Physical layer</strong> and the <strong>Data Link layer</strong>.</p>
+<div class="vs">
+<div><h4>Physical layer</h4>Radio: frequency bands, channels, modulation (OFDM), MIMO antennas, data rates.</div>
+<div><h4>Data Link layer</h4>802.11 MAC: framing, MAC addresses, CSMA/CA, ACKs, RTS/CTS, association with an access point. LLC on top, exactly like Ethernet.</div>
+</div>
+<p><span class="add">+ Added</span> Everything from IP upwards is identical on Wi-Fi and Ethernet. The access point converts 802.11 frames to Ethernet frames, so the rest of the network doesn't care that you're wireless.</p>
+</section>
+
+<section><h2 id="wl-why-ca"><span class="num">17.2</span>Why Wi-Fi uses CSMA/CA instead of CSMA/CD</h2>
+<p>Ethernet historically used <strong>CSMA/CD</strong>. Wi-Fi uses <strong>CSMA/CA</strong>, because <strong>detecting collisions while transmitting wirelessly is difficult</strong>. So Wi-Fi tries to <strong>avoid</strong> collisions rather than detect them after they happen.</p>
+<div class="co added"><span class="lb">+ Added · the three reasons, precisely</span><ul>
+<li><strong>Your own signal drowns everything else.</strong> A radio's transmitted power is millions of times stronger than any signal it could receive at the same moment, so it can't "listen while talking".</li>
+<li><strong>Radios are half-duplex.</strong> Most Wi-Fi radios can't transmit and receive on the same channel simultaneously.</li>
+<li><strong>Hidden terminals.</strong> Even if the sender could listen, the collision happens at the <em>receiver</em>, which the sender may not be able to hear (see 17.4).</li></ul>
+<p>Consequence: every unicast data frame must be <strong>acknowledged</strong>. A missing ACK is the only way the sender learns that something went wrong.</p></div>
+<div class="co qa"><span class="lb">One-line interview answer</span><p><strong>Why CSMA/CA?</strong> Because collision detection is difficult in wireless networks, so Wi-Fi tries to avoid collisions.</p></div>
+</section>
+
+<section><h2 id="wl-ca"><span class="num">17.3</span>CSMA/CA process</h2>
+<p>Basic flow: sense the channel; if it is busy, wait; if it is free, do a random backoff, then transmit and wait for the ACK. If the ACK comes back, done; if not, back off again and retry. Step through it:</p>
+<div class="wg" data-wg="flow-csmaca"></div>
+<pre class="dg">Sense channel
+      ↓
+Is it busy?
+  ↓         ↓
+ <b>YES</b>       <b>NO</b>
+  ↓         ↓
+Wait     Random Backoff
+             ↓
+          Transmit
+             ↓
+           ACK?
+          /    \
+        Yes     No
+        ↓        ↓
+      Done    Backoff + Retry</pre>
+<p><strong>Random backoff is important</strong> because otherwise multiple waiting devices could transmit simultaneously: they would all see the channel go idle at the same instant and all jump in together.</p>
+<div class="co added"><span class="lb">+ Added · timing details (DIFS, SIFS, NAV, contention window)</span><ul>
+<li><strong>DIFS</strong> (DCF Inter-Frame Space): how long the channel must be idle before a station may start its backoff countdown.</li>
+<li><strong>SIFS</strong> (Short IFS): the shorter gap before an ACK, CTS or the next fragment. Because SIFS &lt; DIFS, responses always win the race against new transmissions.</li>
+<li><strong>Backoff</strong>: pick a random number of slots in [0, CW]. The counter only decrements while the channel is idle and freezes when it's busy. CW starts at 15 and roughly doubles after each failed attempt (31, 63 … 1023), just like binary exponential backoff.</li>
+<li><strong>NAV</strong> (Network Allocation Vector): "virtual carrier sense". Every frame carries a Duration field; stations that hear it set a timer and stay silent until it expires, even if they can't physically sense the carrier.</li></ul></div>
+</section>
+
+<section><h2 id="wl-hidden"><span class="num">17.4</span>Hidden terminal problem and RTS/CTS</h2>
+<p>Very important interview question. <strong>A and C cannot hear each other, but both can communicate with B.</strong> A thinks "channel is free"; C also thinks "channel is free". Both transmit to B → <strong>collision at B</strong>. This is the hidden terminal problem.</p>
+<pre class="dg">A -----&gt; B &lt;----- C
+
+A ───────→ B
+C ───────→ B
+       <b>COLLISION</b></pre>
+<div class="wg" data-wg="hidden"></div>
+<p>Wi-Fi can use <strong>RTS = Request To Send</strong> and <strong>CTS = Clear To Send</strong>:</p>
+<div class="flow"><span>Sender → RTS → Receiver</span><span>Sender ← CTS ← Receiver</span><span>Sender → DATA → Receiver</span><span>Sender ← ACK ← Receiver</span></div>
+<p>Other devices hearing the CTS know: <strong>don't transmit now</strong>. This helps reduce the hidden terminal problem. C can't hear A's RTS, but it <em>can</em> hear B's CTS.</p>
+<div class="wg" data-wg="seq-rtscts"></div>
+<div class="co added"><span class="lb">+ Added · RTS/CTS in practice, and the exposed terminal recap</span><ul>
+<li>RTS/CTS costs two extra frames, so it is optional and usually only used for frames larger than the <strong>RTS threshold</strong>.</li>
+<li><strong>Exposed terminal</strong> (the opposite problem): B is sending to A; C hears B and wrongly stays silent, even though C's transmission to D would not interfere at A. Capacity is wasted. RTS/CTS doesn't fully solve this one.</li></ul></div>
+</section>
+
+<section><h2 id="wl-ap"><span class="num">17.5</span>Wi-Fi access point</h2>
+<p>An <strong>Access Point (AP)</strong> connects wireless devices to a wired network. The AP provides wireless network access.</p>
+<pre class="dg">Laptop ))))
+          \
+           <b>AP</b> ─── Switch ─── Router ─── Internet
+          /
+Phone ))))</pre>
+<p><span class="add">+ Added</span> An AP is a <strong>Layer-2 bridge</strong> between 802.11 and Ethernet: it doesn't route. The box at home called a "Wi-Fi router" is really several devices in one: <strong>router + switch + AP + DHCP server + NAT + firewall</strong>.</p>
+</section>
+
+<section><h2 id="wl-modes"><span class="num">17.6</span>Infrastructure mode vs ad hoc mode</h2>
+<div class="vs">
+<div><h4>Infrastructure mode</h4>Devices communicate <strong>through an AP</strong>.<pre class="dg" style="margin:.5rem 0 0">Laptop ──┐
+Phone ───┼── <b>AP</b>
+Tablet ──┘</pre></div>
+<div><h4>Ad hoc mode</h4>Devices communicate <strong>directly with each other</strong> without a central AP (IBSS). <span class="add">+ Added</span> Modern equivalents: Wi-Fi Direct (phone-to-printer, screen casting).</div>
+</div>
+<div class="wg" data-wg="wlanmodes"></div>
+<div class="co added"><span class="lb">+ Added · SSID, BSSID, BSS, ESS, roaming</span><ul>
+<li><strong>SSID</strong>: the network name you see ("CampusWiFi"). Up to 32 bytes.</li>
+<li><strong>BSSID</strong>: the MAC address of one AP's radio. One SSID can have many BSSIDs.</li>
+<li><strong>BSS</strong> (Basic Service Set): one AP and its associated stations. Ad hoc = IBSS (independent BSS).</li>
+<li><strong>ESS</strong> (Extended Service Set): several APs with the same SSID joined by a wired distribution system, e.g. a campus.</li>
+<li><strong>Roaming</strong>: as you walk, your device re-associates to the AP with the stronger signal, keeping the same IP because the whole ESS is one Layer-2 network. 802.11r/k/v make it faster.</li></ul></div>
+</section>
+
+<section><h2 id="wl-bands"><span class="num">17.7</span>Frequency bands and channels <span class="add">+ Added</span></h2>
+<div class="wg" data-wg="wifibands"></div>
+<div class="tbl"><table><thead><tr><th>Band</th><th>Range</th><th>Speed</th><th>Channels</th><th>Notes</th></tr></thead><tbody>
+<tr><td>2.4 GHz</td><td>Longest, best through walls</td><td>Lowest</td><td>Only <strong>3 non-overlapping</strong>: 1, 6, 11 (20 MHz)</td><td>Crowded: microwaves, Bluetooth, neighbours</td></tr>
+<tr><td>5 GHz</td><td>Medium</td><td>High</td><td>Many (20/40/80/160 MHz)</td><td>Some channels need DFS (radar detection)</td></tr>
+<tr><td>6 GHz</td><td>Shortest</td><td>Highest</td><td>Lots of clean spectrum, 320 MHz wide in Wi-Fi 7</td><td>Wi-Fi 6E and 7 only; WPA3 required</td></tr>
+</tbody></table></div>
+<p>Rule of thumb: <strong>higher frequency = more bandwidth and speed, but shorter range and worse wall penetration</strong>. Wider channels carry more data but there are fewer of them, so they interfere more.</p>
+</section>
+
+<section><h2 id="wl-gen"><span class="num">17.8</span>Wi-Fi generations <span class="add">+ Added</span></h2>
+<div class="tbl"><table><thead><tr><th>Name</th><th>Standard</th><th>Year</th><th>Bands</th><th>Max rate (theoretical)</th><th>Key idea</th></tr></thead><tbody>
+<tr><td>(legacy)</td><td>802.11b / a / g</td><td>1999–2003</td><td>2.4 / 5 / 2.4</td><td class="n">11 / 54 / 54 Mbps</td><td>DSSS (b), OFDM (a, g)</td></tr>
+<tr><td>Wi-Fi 4</td><td>802.11n</td><td>2009</td><td>2.4 + 5</td><td class="n">600 Mbps</td><td>MIMO, 40 MHz channels</td></tr>
+<tr><td>Wi-Fi 5</td><td>802.11ac</td><td>2013</td><td>5</td><td class="n">~3.5–6.9 Gbps</td><td>MU-MIMO (downlink), 80/160 MHz</td></tr>
+<tr><td>Wi-Fi 6</td><td>802.11ax</td><td>2019</td><td>2.4 + 5</td><td class="n">~9.6 Gbps</td><td><strong>OFDMA</strong> (many users per transmission), target wake time, better in crowds</td></tr>
+<tr><td>Wi-Fi 6E</td><td>802.11ax</td><td>2020</td><td>+ 6 GHz</td><td class="n">~9.6 Gbps</td><td>Same as Wi-Fi 6, new 6 GHz spectrum</td></tr>
+<tr><td>Wi-Fi 7</td><td>802.11be</td><td>2024</td><td>2.4 + 5 + 6</td><td class="n">~46 Gbps</td><td>320 MHz channels, <strong>Multi-Link Operation</strong>, 4096-QAM</td></tr>
+</tbody></table></div>
+<p>Real throughput is typically a third to a half of the headline number: the air is shared, half-duplex, and full of ACKs and inter-frame gaps.</p>
+</section>
+
+<section><h2 id="wl-security"><span class="num">17.9</span>Wi-Fi security <span class="add">+ Added</span></h2>
+<div class="tbl"><table><thead><tr><th>Protocol</th><th>Encryption</th><th>Status</th></tr></thead><tbody>
+<tr><td>Open</td><td>None</td><td>Anyone nearby can read traffic (use HTTPS / VPN). OWE ("Enhanced Open") adds encryption without a password.</td></tr>
+<tr><td>WEP</td><td>RC4 with a static key and 24-bit IV</td><td><strong>Broken</strong>: cracked in minutes. Never use.</td></tr>
+<tr><td>WPA</td><td>TKIP (RC4 with per-packet keys)</td><td>Stop-gap from 2003; deprecated.</td></tr>
+<tr><td>WPA2</td><td><strong>AES-CCMP</strong></td><td>Standard since 2004. Uses a 4-way handshake to derive per-session keys. Weakness: offline dictionary attacks on captured handshakes (PSK), KRACK (patched).</td></tr>
+<tr><td>WPA3</td><td>AES (GCMP-256 in Enterprise)</td><td><strong>SAE</strong> (Simultaneous Authentication of Equals, "Dragonfly") replaces PSK: resists offline password guessing and gives forward secrecy. Required for 6 GHz.</td></tr>
+</tbody></table></div>
+<ul><li><strong>Personal</strong> (PSK / SAE): one shared password. Home networks.</li><li><strong>Enterprise</strong> (802.1X): each user logs in with their own credentials, checked by a RADIUS server using EAP. Campus and office networks (e.g. eduroam).</li><li>MAC filtering and hiding the SSID are <strong>not</strong> security: MACs are trivially spoofed and hidden SSIDs still appear in probe requests.</li></ul>
+</section>
+
+<section><h2 id="wl-frame"><span class="num">17.10</span>The 802.11 frame, beacons and joining a network <span class="add">+ Added</span></h2>
+<p>An 802.11 frame header has up to <strong>four MAC address fields</strong> (Ethernet has two):</p>
+<div class="tbl"><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Address 1</td><td>Receiver (the next radio to receive it: AP or station)</td></tr>
+<tr><td>Address 2</td><td>Transmitter (the radio sending it right now)</td></tr>
+<tr><td>Address 3</td><td>The other end: the final destination (or original source) on the wired side, or the BSSID</td></tr>
+<tr><td>Address 4</td><td>Only used when frames are relayed AP-to-AP (wireless distribution system / mesh)</td></tr>
+</tbody></table></div>
+<p>The <strong>Frame Control</strong> field has <em>To DS / From DS</em> bits that say which addresses mean what; the <strong>Duration</strong> field sets other stations' NAV; the frame ends with a CRC-32 <strong>FCS</strong>.</p>
+<ul><li><strong>Management frames</strong>: beacon, probe request/response, authentication, association.</li><li><strong>Control frames</strong>: RTS, CTS, ACK.</li><li><strong>Data frames</strong>: your actual packets.</li></ul>
+<p><strong>Beacon frames</strong>: an AP broadcasts a beacon about every 102.4 ms announcing its SSID, supported rates, security and timing. Devices find networks by <strong>passive scanning</strong> (listen for beacons) or <strong>active scanning</strong> (send probe requests).</p>
+<div class="flow"><span>Scan (beacons / probes)</span><span>Authenticate (open system, or SAE in WPA3)</span><span>Associate with the AP (gets an association ID)</span><span>WPA2/WPA3 4-way handshake → encryption keys</span><span>DHCP → IP address, gateway, DNS</span><span>Ready: ARP, DNS, TCP… as on any LAN</span></div>
+</section>
+
+<section><h2 id="wl-must"><span class="num">17.11</span>Placement must-remember</h2>
+<div class="co key"><span class="lb">Wireless</span><span class="fx">Wi-Fi → IEEE 802.11</span><span class="fx">Wi-Fi → CSMA/CA</span><span class="fx">Ethernet → historically CSMA/CD</span><span class="fx">Hidden terminal → RTS/CTS</span><span class="fx">AP → connects wireless devices to network</span></div>
+<div class="co added"><span class="lb">+ Added · also good to know</span><ul><li><strong>Bluetooth</strong> = IEEE 802.15.1, a PAN technology in the 2.4 GHz band (frequency hopping, ~10 m). Bluetooth Low Energy for wearables and sensors.</li><li><strong>Cellular</strong> (4G LTE, 5G) is a WAN technology run by carriers; your phone gets an IP from the carrier, usually behind carrier-grade NAT.</li><li>Wi-Fi throughput drops for everyone when one slow, distant client is connected, because airtime is shared (the "rate anomaly").</li></ul></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Basics</h4><ul><li>Wi-Fi = IEEE 802.11, Physical + Data Link</li><li>CSMA/CA, not CD: can't hear collisions while sending</li><li>Every unicast frame is ACKed</li></ul></div>
+<div><h4>CSMA/CA</h4><ul><li>Sense → busy? wait : random backoff → transmit → ACK?</li><li>No ACK → backoff (CW doubles) + retry</li><li>SIFS &lt; DIFS; NAV = virtual carrier sense</li></ul></div>
+<div><h4>Hidden terminal</h4><ul><li>A and C can't hear each other → collide at B</li><li>RTS → CTS → DATA → ACK</li><li>Others hear CTS and stay quiet</li><li>Exposed terminal = needless silence</li></ul></div>
+<div><h4>Topology</h4><ul><li>AP = L2 bridge wireless ↔ wired</li><li>Infrastructure (via AP) vs ad hoc (direct)</li><li>SSID name · BSSID = AP MAC · ESS = many APs, roaming</li></ul></div>
+<div><h4>Bands &amp; generations</h4><ul><li>2.4 GHz: range, channels 1/6/11</li><li>5/6 GHz: speed, shorter range</li><li>Wi-Fi 4/5/6/6E/7 = n/ac/ax/ax/be</li></ul></div>
+<div><h4>Security</h4><ul><li>WEP broken → WPA (TKIP) → WPA2 (AES-CCMP) → WPA3 (SAE)</li><li>Personal (password) vs Enterprise (802.1X)</li><li>802.11 frame: up to 4 MAC addresses</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: VPN ================= -->
+<article class="ch" data-ch="vpn" hidden>
+<div class="pane notes">
+<section><h2 id="vpn-tunnel"><span class="num">18.1</span>Tunneling</h2>
+<p>Tunneling means <strong>encapsulating one protocol's packet inside another protocol so it can travel through a network</strong>.</p>
+<div class="flow"><span>Original Packet</span><span>Encapsulate inside another packet</span><span>Travel through network</span><span>Decapsulate</span><span>Original Packet</span></div>
+<h3>Example</h3>
+<p>Two private networks, A and B, are connected only through the Internet. We can create a tunnel between them:</p>
+<pre class="dg">Private network A
+      |
+      | Internet
+      |
+Private network B
+
+Original IP packet
+       ↓
+[<b>New outer IP header</b>
+ Original IP packet]
+       ↓
+     Internet
+       ↓
+Remove outer header
+       ↓
+Original packet</pre>
+<p>The intermediate Internet routers mainly deal with the <strong>outer packet</strong>: they route on the outer header and never look inside. The far end <strong>decapsulates</strong> (removes the outer header) and forwards the original packet as if it had never left the private network.</p>
+<div class="wg" data-wg="tunnel"></div>
+<p><span class="add">+ Added</span> Tunneling is everywhere, not just in VPNs: <strong>6in4</strong> carries IPv6 inside IPv4 (see IPv6 transition), <strong>GRE</strong> carries almost anything inside IP, <strong>VXLAN</strong> carries Ethernet frames inside UDP in data centres, and <strong>MPLS</strong> adds labels in front of IP.</p>
+<div class="co qa"><span class="lb">One-line interview answer</span><p><strong>What is tunneling?</strong> Encapsulating one protocol packet inside another packet to carry it across a network.</p></div>
+</section>
+
+<section><h2 id="vpn-what"><span class="num">18.2</span>VPN: Virtual Private Network</h2>
+<p>A VPN uses <strong>tunneling plus security mechanisms</strong> to create a secure connection over an untrusted network such as the Internet.</p>
+<div class="flow"><span>Your device</span><span>VPN encryption / tunnel</span><span>Internet</span><span>VPN server</span><span>Destination</span></div>
+<h3>Why VPN?</h3>
+<ul><li><strong>Secure communication over public networks</strong> (café, airport, hostel Wi-Fi)</li><li><strong>Remote access to private company networks</strong> (work from home)</li><li><strong>Protecting traffic from local network observers</strong> (the Wi-Fi owner, your ISP)</li><li><strong>Connecting geographically separated private networks</strong> (branch offices)</li></ul>
+<h3>VPN tunneling</h3>
+<div class="vs">
+<div><h4>Without VPN</h4><pre class="dg" style="margin:.4rem 0 0">Your Device ── Internet ── Server</pre></div>
+<div><h4>With VPN</h4><pre class="dg" style="margin:.4rem 0 0">Your Device
+     ↓
+<b>Encrypted VPN tunnel</b>
+     ↓
+Internet
+     ↓
+VPN Server
+     ↓
+Destination</pre></div>
+</div>
+<p>The <strong>original packet is encapsulated inside another packet</strong>. Observers on the path see only encrypted traffic between your device and the VPN server; the destination sees the VPN server's IP, not yours.</p>
+<div class="co qa"><span class="lb">One-line interview answer</span><p><strong>What is a VPN?</strong> A secure logical connection over an untrusted network, commonly using tunneling plus encryption/authentication.</p></div>
+</section>
+
+<section><h2 id="vpn-vs-tunnel"><span class="num">18.3</span>VPN vs tunneling</h2>
+<p>Don't treat them as exactly the same.</p>
+<div class="vs">
+<div><h4>Tunneling</h4>A <strong>technique</strong>: packet inside another packet. On its own it gives <em>no</em> confidentiality.</div>
+<div><h4>VPN</h4>A <strong>networking service / architecture</strong> that commonly uses <strong>tunneling + authentication + encryption/integrity</strong>.</div>
+</div>
+<div class="tbl"><table><thead><tr><th></th><th>Tunneling</th><th>VPN</th></tr></thead><tbody>
+<tr><td>What it is</td><td>Encapsulation technique</td><td>Secure private network built on top of a public one</td></tr>
+<tr><td>Encryption</td><td>Not necessarily (GRE has none)</td><td>Yes (normally)</td></tr>
+<tr><td>Authentication</td><td>Not necessarily</td><td>Yes: both ends prove who they are</td></tr>
+<tr><td>Example</td><td>GRE, 6in4, VXLAN</td><td>IPsec, OpenVPN, WireGuard</td></tr>
+</tbody></table></div>
+</section>
+
+<section><h2 id="vpn-protocols"><span class="num">18.4</span>VPN protocol examples</h2>
+<p>You may hear: <strong>IPsec, OpenVPN, WireGuard, GRE</strong>.</p>
+<div class="co key"><span class="lb">Important distinction</span><p><strong>GRE</strong> provides tunneling/encapsulation but by itself does <strong>not</strong> provide encryption. <strong>IPsec</strong> can provide <strong>authentication, integrity and encryption</strong> depending on the configuration.</p></div>
+<div class="tbl"><table><thead><tr><th>Protocol</th><th>Layer / transport</th><th>Security</th><th>Notes</th></tr></thead><tbody>
+<tr><td>GRE</td><td>IP protocol 47</td><td>None</td><td>Generic Routing Encapsulation: carries multicast and routing protocols; often run <strong>inside IPsec</strong> (GRE over IPsec) to get both.</td></tr>
+<tr><td>IPsec</td><td>Network layer; ESP = IP protocol 50, AH = 51; IKE on UDP 500/4500</td><td>Auth + integrity + encryption</td><td>Standard for site-to-site VPNs between routers/firewalls. Protects every IP packet transparently.</td></tr>
+<tr><td>OpenVPN <span class="add">+ Added</span></td><td>Userspace, over UDP or TCP (default 1194)</td><td>TLS for the handshake</td><td>Flexible, open source, works through most firewalls (can run on TCP 443).</td></tr>
+<tr><td>WireGuard <span class="add">+ Added</span></td><td><strong>UDP only</strong> (commonly 51820)</td><td>Modern fixed crypto: Curve25519, ChaCha20-Poly1305</td><td>~4,000 lines of code vs hundreds of thousands, built into Linux; very fast, roams cleanly between networks.</td></tr>
+<tr><td>L2TP/IPsec, SSTP, PPTP <span class="add">+ Added</span></td><td>various</td><td>PPTP is broken</td><td>Older remote-access protocols. L2TP alone has no encryption, hence "L2TP/IPsec".</td></tr>
+<tr><td>SSL/TLS VPN <span class="add">+ Added</span></td><td>HTTPS (443)</td><td>TLS</td><td>Remote access through a browser portal or client; passes firewalls easily.</td></tr>
+</tbody></table></div>
+</section>
+
+<section><h2 id="vpn-ipsec"><span class="num">18.5</span>IPsec in more depth <span class="add">+ Added</span></h2>
+<div class="vs">
+<div><h4>AH: Authentication Header</h4><ul><li>IP protocol 51</li><li>Authentication + integrity (including most of the outer IP header)</li><li><strong>No encryption</strong></li><li>Breaks through NAT (NAT changes the header AH protects)</li></ul></div>
+<div><h4>ESP: Encapsulating Security Payload</h4><ul><li>IP protocol 50</li><li><strong>Encryption</strong> + integrity + authentication of the payload</li><li>What almost everyone uses</li><li>Works through NAT using <strong>NAT-T</strong> (ESP inside UDP 4500)</li></ul></div>
+</div>
+<div class="vs">
+<div><h4>Transport mode</h4>Protects only the <strong>payload</strong>; the original IP header stays. Host-to-host.<pre class="dg" style="margin:.5rem 0 0">[IP hdr][<b>ESP</b>][TCP + data 🔒][ESP trailer]</pre></div>
+<div><h4>Tunnel mode</h4>The <strong>whole original packet</strong> is encrypted and wrapped in a <strong>new outer IP header</strong>. Gateway-to-gateway (site-to-site VPNs).<pre class="dg" style="margin:.5rem 0 0">[<b>New IP</b>][<b>ESP</b>][orig IP + TCP + data 🔒][trailer]</pre></div>
+</div>
+<ul><li><strong>IKE</strong> (Internet Key Exchange, v2 today, UDP 500): the two ends authenticate each other (pre-shared key or certificates) and run Diffie-Hellman to agree on keys.</li><li>The agreed parameters form a <strong>Security Association (SA)</strong>: algorithms, keys and lifetime, one per direction, identified by an SPI number in each ESP packet.</li><li>Classic two phases: Phase 1 builds a secure channel for IKE itself; Phase 2 negotiates the SAs that protect the data.</li></ul>
+</section>
+
+<section><h2 id="vpn-types"><span class="num">18.6</span>VPN types</h2>
+<div class="vs">
+<div><h4>Remote-access VPN</h4>An <strong>individual user</strong> connects to an organisation.<pre class="dg" style="margin:.5rem 0 0">Employee → Internet → Company Network</pre></div>
+<div><h4>Site-to-site VPN</h4><strong>Two networks</strong> are connected.<pre class="dg" style="margin:.5rem 0 0">Office A ←── VPN ──→ Office B</pre></div>
+</div>
+<div class="wg" data-wg="vpntypes"></div>
+<div class="tbl"><table><thead><tr><th></th><th>Remote access</th><th>Site-to-site</th></tr></thead><tbody>
+<tr><td>Who connects</td><td>One device (laptop, phone)</td><td>Two gateways (routers / firewalls)</td></tr>
+<tr><td>Client software</td><td>Needed on the device</td><td>None on hosts: transparent to users</td></tr>
+<tr><td>Typical protocol</td><td>SSL/TLS VPN, OpenVPN, WireGuard, IKEv2</td><td>IPsec tunnel mode</td></tr>
+<tr><td>Always on?</td><td>When the user connects</td><td>Permanently</td></tr>
+</tbody></table></div>
+<p><span class="add">+ Added</span> <strong>Split tunneling</strong>: only traffic for the company network goes through the VPN; everything else (YouTube, updates) goes straight to the Internet. Saves bandwidth, but that traffic isn't protected or inspected. <strong>Full tunnel</strong> sends everything through the VPN.</p>
+</section>
+
+<section><h2 id="vpn-proxy"><span class="num">18.7</span>VPN vs proxy, and common misconceptions <span class="add">+ Added</span></h2>
+<div class="tbl"><table><thead><tr><th></th><th>VPN</th><th>Proxy</th></tr></thead><tbody>
+<tr><td>Layer</td><td>Network (all IP traffic of the device)</td><td>Application (one app or protocol, e.g. the browser)</td></tr>
+<tr><td>Encryption</td><td>Yes, device ↔ VPN server</td><td>Usually not (an HTTP proxy just forwards)</td></tr>
+<tr><td>Setup</td><td>OS-level client / virtual network interface</td><td>Per-application setting</td></tr>
+<tr><td>Hides your IP from the site</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Typical use</td><td>Security on untrusted networks, corporate access</td><td>Filtering, caching, simple IP masking</td></tr>
+</tbody></table></div>
+<ul><li>A VPN does <strong>not</strong> make you anonymous: the VPN provider sees all your traffic metadata, and the site still sees cookies and logins.</li><li>The VPN only encrypts up to the VPN server. From there to the website you still need <strong>HTTPS</strong>.</li><li><strong>MTU overhead</strong>: every tunnel adds headers (IPsec ~50–70 bytes, WireGuard 60–80), so the inner MTU shrinks. VPN gateways clamp TCP MSS to avoid fragmentation.</li></ul>
+</section>
+
+<section><h2 id="vpn-must"><span class="num">18.8</span>Placement must-remember</h2>
+<div class="co key"><span class="lb">Tunneling &amp; VPN</span><span class="fx">Tunneling → packet inside another packet</span><span class="fx">VPN → secure private communication over a public network</span><span class="fx">VPN = tunneling + authentication + encryption/integrity</span><span class="fx">GRE → tunneling only, no encryption</span><span class="fx">IPsec → authentication + integrity + encryption</span><span class="fx">Remote-access (user → company) vs site-to-site (office ↔ office)</span></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Tunneling</h4><ul><li>Packet inside another packet</li><li>Outer IP header; routers only see the outer one</li><li>Decapsulate at the far end</li><li>GRE, 6in4, VXLAN</li></ul></div>
+<div><h4>VPN</h4><ul><li>Tunnel + authentication + encryption/integrity</li><li>Public Wi-Fi, remote access, hide from local observers, connect sites</li><li>Not anonymity; still need HTTPS</li></ul></div>
+<div><h4>Protocols</h4><ul><li>GRE (proto 47): no encryption</li><li>IPsec: ESP (50) encrypts, AH (51) auth only; IKE UDP 500</li><li>WireGuard: UDP; OpenVPN: TLS</li></ul></div>
+<div><h4>IPsec modes</h4><ul><li>Transport: payload only, host-to-host</li><li>Tunnel: whole packet + new IP header, site-to-site</li></ul></div>
+<div><h4>Types</h4><ul><li>Remote access: user → company</li><li>Site-to-site: office ↔ office</li><li>Split vs full tunnel</li><li>VPN (L3, all traffic) vs proxy (L7, one app)</li></ul></div>
+</div>
+</div>
+</article>

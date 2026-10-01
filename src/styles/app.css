@@ -1,0 +1,96 @@
+/* App additions on top of design.css (same tokens, same look). */
+body{margin:0;overflow-x:hidden}
+.notes h2,.notes h3{scroll-margin-top:7.5rem}
+@media (max-width:560px){.notes h2,.notes h3{scroll-margin-top:10.5rem}}
+.linkish{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font:inherit}
+.qs-more{margin-top:1.4rem;font-size:.9rem;color:var(--muted)}
+.fc-hint{font-size:.78rem;color:var(--muted);margin:0;font-family:var(--f-mono)}
+.qz-best{margin:0;color:var(--muted);font-size:.9rem}
+.qq-ch{font-family:var(--f-mono);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:-.35rem 0 .5rem 1.6rem}
+.opt-k{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);margin-right:.35rem}
+.home-prog{color:var(--muted);margin:0}
+.wg select.sel,select.sel{font:inherit;font-size:.88rem;padding:.4rem .55rem;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);margin-left:.35rem}
+.ch-meta .chip{white-space:nowrap}
+.content{overflow-x:clip}
+/* the Rail's scrim is only meaningful on small screens */
+@media (min-width:901px){.scrim{display:none}}
+
+/* ---------- widget helpers ---------- */
+.wg .row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.wg .muted{color:var(--muted)}
+.wg .small{font-size:.82rem}
+.wg .err{color:var(--bad);font-size:.85rem;margin-top:.5rem}
+.wg .ok-t{color:var(--good)}
+.wg .bad-t{color:var(--bad)}
+.wg input[type=range]{accent-color:var(--accent);min-width:8rem;max-width:100%}
+.wg .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(16rem,1fr));gap:1rem}
+.wg .pill{display:inline-block;font-family:var(--f-mono);font-size:.72rem;padding:.1rem .45rem;border-radius:5px;background:var(--surface-2);color:var(--ink)}
+.wg .pill.on{background:var(--accent);color:var(--accent-ink)}
+.wg .tabs-mini{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.7rem}
+.wg .tabs-mini button{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:.3rem .65rem;font-size:.82rem;cursor:pointer}
+.wg .tabs-mini button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.wg table{font-size:.84rem}
+.wg th,.wg td{padding:.4rem .55rem}
+.wg .tbl{margin:.7rem 0 0}
+.wg td.chg{background:color-mix(in srgb,var(--warn) 22%,transparent)}
+.wg tr.hl td{background:var(--accent-soft)}
+.wg tr.win td{background:var(--good-soft)}
+.wg tr.dimrow td{opacity:.45}
+.wg .bits{display:flex;flex-wrap:wrap;gap:3px;font-family:var(--f-mono)}
+.wg .bit{width:1.9rem;height:2.2rem;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer;font-size:.95rem;position:relative;padding:0}
+.wg .bit small{position:absolute;top:-1px;left:3px;font-size:.55rem;color:var(--muted)}
+.wg .bit.p{background:color-mix(in srgb,var(--accent) 16%,var(--bg));border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.wg .bit.flipped{background:var(--bad-soft);border-color:var(--bad)}
+.wg .bit.fixed{background:var(--good-soft);border-color:var(--good)}
+.wg .bit.net{background:color-mix(in srgb,var(--lc,var(--accent)) 22%,var(--bg));border-color:color-mix(in srgb,var(--lc,var(--accent)) 50%,var(--line))}
+.wg .bit.ro{cursor:default}
+.wg .divline{white-space:pre;font-family:var(--f-mono);font-size:.84rem;line-height:1.35}
+.wg .divline .x{color:var(--muted)}
+.wg .divline .r{color:var(--good);font-weight:600}
+.wg .divline .g{color:var(--lc,var(--accent));font-weight:600}
+.wg svg text{font-family:var(--f-mono)}
+.wg .svg-wrap{overflow-x:auto}
+.wg .legend{display:flex;flex-wrap:wrap;gap:.8rem;font-size:.78rem;color:var(--muted);margin-top:.5rem;font-family:var(--f-mono)}
+.wg .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:.3rem}
+.wg .hdr-grid{display:grid;grid-template-columns:repeat(32,minmax(0,1fr));gap:2px;font-family:var(--f-mono);font-size:.68rem;min-width:30rem}
+.wg .hdr-grid .ruler{color:var(--muted);text-align:center;font-size:.58rem}
+.wg .hdr-grid button{border:1px solid var(--line);border-radius:5px;background:color-mix(in srgb,var(--fc,var(--accent)) 14%,var(--bg));padding:.45rem .2rem;cursor:pointer;font-size:.7rem;line-height:1.15;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wg .hdr-grid button.on{background:var(--fc,var(--accent));color:var(--accent-ink);border-color:transparent}
+.wg .blocks{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:1.4rem 0 .3rem;position:relative}
+.wg .blk{flex:none;width:2.3rem;height:2.3rem;border-radius:6px;display:grid;place-items:center;font-family:var(--f-mono);font-size:.7rem;border:1px solid var(--line);background:var(--bg);transition:background .3s}
+.wg .blk.acked{background:var(--good-soft);border-color:var(--good)}
+.wg .blk.flight{background:var(--warn-soft);border-color:var(--warn)}
+.wg .blk.usable{background:var(--accent-soft);border-color:var(--accent)}
+.wg .blk.lost{background:var(--bad-soft);border-color:var(--bad)}
+.wg .blk.re{outline:2px solid var(--bad);outline-offset:1px}
+.wg .winbox{position:absolute;top:1rem;height:3.1rem;border:2px solid var(--ink);border-radius:8px;transition:left .35s,width .35s;pointer-events:none}
+.wg .winbox span{position:absolute;top:-1.15rem;left:0;font-family:var(--f-mono);font-size:.65rem;color:var(--ink);white-space:nowrap}
+.wg .meter{height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden;position:relative}
+.wg .meter i{position:absolute;inset:0 auto 0 0;border-radius:7px;transition:width .3s}
+.wg .stack{display:flex;flex-direction:column;gap:.3rem}
+.wg .nest{border-radius:8px;padding:.35rem .5rem;font-family:var(--f-mono);font-size:.78rem;border:1px solid var(--line)}
+.wg .flash-cell{animation:cellflash 1s ease}
+@keyframes cellflash{0%{background:color-mix(in srgb,var(--warn) 40%,transparent)}100%{background:transparent}}
+.wg .codes{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.4rem;margin-top:.6rem}
+.wg .codes button{text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:.4rem .55rem;cursor:pointer;font-size:.82rem;border-left:4px solid var(--cc)}
+.wg .codes button b{font-family:var(--f-mono);margin-right:.3rem}
+.wg .codes button.on{background:color-mix(in srgb,var(--cc) 16%,var(--bg))}
+.wg .grp-h{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:.8rem}
+.wg .seq-note{min-height:4.2rem}
+.wg .hop-path{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;font-family:var(--f-mono);font-size:.78rem}
+.wg .hop-path span{padding:.25rem .5rem;border-radius:6px;border:1px solid var(--line);background:var(--bg)}
+.wg .hop-path span.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.wg .hop-path i{color:var(--muted);font-style:normal}
+.wg .decision{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.45rem}
+.wg .chart-tip{font-family:var(--f-mono);font-size:.8rem;min-height:1.4rem;margin-top:.3rem}
+.wg .tag-l{font-family:var(--f-mono);font-size:.62rem;padding:.06rem .38rem;border-radius:4px;color:var(--accent-ink);text-transform:uppercase;letter-spacing:.05em;background:var(--tc,var(--muted));font-weight:500}
+.wg .pkt{fill:var(--warn);stroke:var(--surface);stroke-width:2}
+.wg .moving{transition:transform .7s ease-in-out}
+.wg .k-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(1.7rem,1fr));gap:3px;margin-top:.6rem}
+.wg .k-grid span{font-family:var(--f-mono);font-size:.68rem;text-align:center;padding:.2rem 0;border-radius:4px;background:var(--surface-2)}
+.wg .k-grid span.on{background:var(--accent);color:var(--accent-ink)}
+@media (prefers-reduced-motion: reduce){.wg .moving,.wg .winbox{transition:none}}
+@media (max-width:560px){
+  .wg{padding:.85rem .8rem 1rem}
+  .wg .bit{width:1.65rem;height:2rem}
+}

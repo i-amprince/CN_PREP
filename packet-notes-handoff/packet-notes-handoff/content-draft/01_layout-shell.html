@@ -1,0 +1,71 @@
+<div class="app" id="app">
+<aside class="rail" id="rail" aria-label="Chapters">
+  <a class="brand" href="#home">
+    <svg class="brand-mark" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--ink)"/><rect x="7" y="8" width="20" height="3.2" rx="1.6" fill="var(--l7)"/><rect x="7" y="13.2" width="20" height="3.2" rx="1.6" fill="var(--l4)"/><rect x="7" y="18.4" width="20" height="3.2" rx="1.6" fill="var(--l3)"/><rect x="7" y="23.6" width="20" height="3.2" rx="1.6" fill="var(--l2)"/></svg>
+    <span><b>Packet Notes</b><small>CN revision</small></span>
+  </a>
+  <div class="prog">
+    <div class="prog-row"><span>Chapters done</span><span id="progTxt">0 / 0</span></div>
+    <div class="bar"><i id="progBar"></i></div>
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <a class="btn sm" href="#practice" style="justify-content:center">Practice: all flashcards &amp; quiz</a>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
+<div class="main">
+  <header class="top">
+    <button class="ibtn menu-btn" id="menuBtn" aria-label="Open chapter list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search topics: ARP, TIME_WAIT, subnet, port 53…" autocomplete="off" aria-label="Search notes">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <div class="tools">
+      <div class="seg" role="group" aria-label="Study mode">
+        <button id="modeStudy" class="on" title="Full notes with diagrams">Study</button>
+        <button id="modeQuick" title="Open each chapter on its quick revision sheet">Quick</button>
+      </div>
+      <button class="ibtn" id="themeBtn" aria-label="Switch light or dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </div>
+  </header>
+  <main class="content" id="content">
+
+  <!-- HOME -->
+  <div class="view" id="v-home">
+    <div class="hero">
+      <div>
+        <div class="eyebrow">Computer Networks · placement &amp; interview revision</div>
+        <h1>Every layer, <span>one packet</span> at a time.</h1>
+        <p>All your notes, reorganised into 21 chapters, with the gaps filled in (subnetting, delays, ALOHA, VLANs, RTO, HTTP caching, security and more). Each chapter has full notes, a one-page quick sheet, flashcards and a quiz. Diagrams you can click through replace most of the ASCII art.</p>
+        <div class="cta">
+          <a class="btn pri" href="#osi">Start revising</a>
+          <a class="btn" href="#journey">Type google.com: the full journey</a>
+          <a class="btn" href="#cheatsheet">Cheat sheet</a>
+        </div>
+      </div>
+      <div class="encap-hero"><div class="wg-h" style="margin:0 0 .6rem"><b>Encapsulation, live</b><span>sender side</span></div><div id="heroEnc"></div></div>
+    </div>
+    <div class="units" id="unitCards"></div>
+    <div class="home-sec">
+      <h2>How to use this</h2>
+      <div class="how">
+        <div><b>Study mode</b>Full notes, worked examples and interactive diagrams. Use it the first time through.</div>
+        <div><b>Quick mode</b>Every chapter opens on its quick sheet: just the must-remember lines. Use it the night before.</div>
+        <div><b>Flashcards &amp; quiz</b>Every chapter has both. The Practice page mixes all of them.</div>
+        <div><b>+ Added</b>Anything marked with this tag was not in your notes. I added it to fill a gap.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRACTICE -->
+  <div class="view" id="v-practice" hidden>
+    <div class="ch">
+      <div class="ch-head"><div class="ch-meta"><span class="chip">All chapters</span></div><h1>Practice</h1><p class="lede">Mixed flashcards from every chapter, and a fresh 15-question quiz each time you press "New quiz".</p></div>
+      <div class="tabs" id="prTabs"><button class="on" data-t="fc">Flashcards</button><button data-t="qz">Mixed quiz</button></div>
+      <div class="pane" id="pr-fc"></div>
+      <div class="pane" id="pr-qz" hidden></div>
+    </div>
+  </div>
+
+  <!-- CHAPTER HOST -->
+  <div class="view" id="v-ch" hidden></div>

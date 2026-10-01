@@ -1,0 +1,224 @@
+
+<!-- ================= CH: DATA LINK ================= -->
+<article class="ch" data-ch="datalink" hidden>
+<div class="pane notes">
+<p>This is an important placement topic because MAC, Ethernet, frames, collision domains, and switching all connect here.</p>
+<section><h2 id="dl-job"><span class="num">2.1</span>What does the Data Link layer do?</h2>
+<p>The Data Link layer provides <strong>node-to-node delivery</strong> (one hop). Its main responsibilities:</p>
+<ul><li><strong>Framing</strong>: wrapping the packet with a header and trailer</li><li><strong>MAC addressing</strong></li><li><strong>Error detection</strong> (FCS/CRC)</li><li><strong>Medium access control</strong> (who may transmit on a shared medium)</li><li><strong>Flow control</strong> in some link-layer protocols</li></ul>
+<div class="flow"><span>Network Layer → IP packet</span><span>Data Link Layer → Ethernet Frame</span><span>Physical Layer → Bits</span></div>
+<h3>Two sublayers</h3>
+<ul class="tree"><li><span class="t">DATA LINK</span><ul><li><span class="t">LLC</span> <em>(Logical Link Control) interface between Network layer and MAC</em></li><li><span class="t">MAC</span> <em>(Media Access Control) MAC addressing · controlling access to the shared medium · frame-related functions</em></li></ul></li></ul>
+<p>CSMA/CD and CSMA/CA operate at the <strong>MAC sublayer</strong>.</p>
+<h3>Framing methods <span class="add">+ Added</span></h3>
+<p>How does the receiver know where a frame starts and ends? <strong>Character count</strong> (rarely used), <strong>byte stuffing</strong> (flag byte; escape any flag inside the data with an ESC byte), <strong>bit stuffing</strong> (HDLC flag 01111110; after five consecutive 1s in the data, insert a 0), and physical-layer coding violations. Ethernet uses a preamble + Start Frame Delimiter plus inter-frame gaps.</p>
+</section>
+
+<section><h2 id="dl-mac"><span class="num">2.2</span>MAC address</h2>
+<p>A MAC address identifies a network interface at the Data Link layer. Example: <code>48:2A:E3:91:AB:10</code>. It is <strong>48 bits = 6 bytes</strong>, written as 12 hex digits.</p>
+<div class="wg" data-wg="macaddr"></div>
+<ul><li>First 24 bits = <strong>OUI</strong> (Organisationally Unique Identifier, the vendor) <span class="add">+ Added</span></li><li>Last 24 bits = NIC-specific part assigned by the vendor</li><li>Least-significant bit of the first byte: <strong>0 = unicast, 1 = multicast</strong>. Second-least: 0 = globally unique, 1 = locally administered (e.g. phone MAC randomisation)</li><li>Broadcast MAC = <code>FF:FF:FF:FF:FF:FF</code></li></ul>
+<div class="co key"><span class="lb">Remember</span><p>IP is used for routing <strong>between networks</strong>. MAC is used for delivery <strong>on the local link</strong>.</p></div>
+</section>
+
+<section><h2 id="dl-frame"><span class="num">2.3</span>Ethernet frame</h2>
+<div class="wg" data-wg="ethframe"></div>
+<p>Important fields: <strong>Destination MAC, Source MAC, Type/Length, Data, FCS</strong>. Destination comes <em>first</em> so a switch can start forwarding as soon as it reads 6 bytes (cut-through switching).</p>
+<p><strong>FCS (Frame Check Sequence)</strong> is used for error detection, using a 32-bit CRC. It detects whether the frame was corrupted in transmission; a bad frame is silently dropped (Ethernet does not retransmit, higher layers like TCP do).</p>
+<div class="co added"><span class="lb">+ Added · numbers to remember</span><ul>
+<li>Preamble 7 B + SFD 1 B (not counted in frame size)</li>
+<li>Header 14 B (6 + 6 + 2) + FCS 4 B = 18 B overhead</li>
+<li>Payload 46–1500 B → frame <strong>64–1518 B</strong> (1522 with an 802.1Q VLAN tag)</li>
+<li><strong>MTU = 1500 B</strong>. Payload shorter than 46 B is padded.</li>
+<li>Type values: 0x0800 = IPv4, 0x0806 = ARP, 0x86DD = IPv6, 0x8100 = VLAN tag</li></ul></div>
+</section>
+
+<section><h2 id="dl-hubswitch"><span class="num">2.4</span>Hub vs switch, and how a switch learns</h2>
+<p>A very common interview question. A <strong>hub</strong> (Layer 1) repeats the signal to all ports. A <strong>switch</strong> (Layer 2) keeps a MAC → port table and only sends the frame where it needs to go.</p>
+<p>Try it: send frames between hosts and watch the table fill in. Toggle hub mode to compare.</p>
+<div class="wg" data-wg="switchsim"></div>
+<h3>The learning process, step by step</h3>
+<ol><li>A sends a frame to B. The switch sees <code>Source MAC = A</code> on port 1, so it learns <strong>A → Port 1</strong>.</li>
+<li>It checks the destination MAC B. If B is unknown, it <strong>floods</strong> the frame out all ports <strong>except the incoming port</strong>.</li>
+<li>When B replies, the switch learns <strong>B → Port 2</strong>.</li>
+<li>Now A → B frames are forwarded directly to port 2 only.</li></ol>
+<div class="co key"><span class="lb">Classic interview line</span><p>A switch <strong>learns from the SOURCE MAC</strong> and <strong>forwards based on the DESTINATION MAC</strong>.</p></div>
+<p><span class="add">+ Added</span> Entries <strong>age out</strong> (typically 300 s) so the table stays current when devices move. Broadcast frames (FF:FF…) and unknown unicast are always flooded. Switching modes: <strong>store-and-forward</strong> (receive whole frame, check FCS, then forward) vs <strong>cut-through</strong> (forward after reading destination MAC; lower latency, may pass bad frames).</p>
+</section>
+
+<section><h2 id="dl-domains"><span class="num">2.5</span>Collision domain vs broadcast domain</h2>
+<div class="wg" data-wg="domains"></div>
+<div class="vs">
+<div><h4>Collision domain</h4>A region where transmitted frames can collide. All devices on a hub share <strong>one</strong> collision domain. Each switch port is generally a <strong>separate</strong> collision domain.</div>
+<div><h4>Broadcast domain</h4>The group of devices that receive a Layer-2 broadcast. A <strong>router</strong> separates broadcast domains: a broadcast from Network A does not normally cross the router. VLANs also split them.</div>
+</div>
+<div class="co key"><span class="lb">Quick memory</span><span class="fx">Switch → separates collision domains</span><span class="fx">Router → separates broadcast domains</span></div>
+<div class="co added"><span class="lb">+ Added · counting question</span><p>"2 hubs (4 PCs each) connected to a switch, switch connected to a router" → collision domains = 2 (one per hub port on the switch) + 1 (switch–router link) = <strong>3</strong>; broadcast domains = <strong>1</strong> on that side of the router. Rule: count switch/router ports in use for collision domains; count router interfaces (or VLANs) for broadcast domains.</p></div>
+</section>
+
+<section><h2 id="dl-vlan"><span class="num">2.6</span>VLANs <span class="add">+ Added</span></h2>
+<p>A <strong>VLAN</strong> (Virtual LAN) splits one physical switch into several logical Layer-2 networks. Each VLAN is its own <strong>broadcast domain</strong>, so traffic between VLANs needs a router (or a Layer-3 switch): "inter-VLAN routing".</p>
+<ul><li><strong>IEEE 802.1Q</strong> inserts a 4-byte tag (12-bit VLAN ID → up to 4094 usable VLANs) into the frame.</li><li><strong>Access port</strong>: belongs to one VLAN, untagged frames (to a PC).</li><li><strong>Trunk port</strong>: carries many VLANs, tagged frames (switch to switch).</li><li>Why: security isolation (HR vs guests), smaller broadcast domains, flexible grouping without rewiring.</li></ul>
+</section>
+
+<section><h2 id="dl-stp"><span class="num">2.7</span>Spanning Tree Protocol (STP) <span class="add">+ Added</span></h2>
+<p>Redundant links between switches create <strong>loops</strong>. Ethernet frames have no TTL, so a broadcast circles forever: a <strong>broadcast storm</strong>, plus MAC table instability. <strong>STP (IEEE 802.1D)</strong> fixes this by logically blocking some ports so the active topology is a tree.</p>
+<ol><li>Elect a <strong>root bridge</strong> (lowest Bridge ID = priority + MAC).</li><li>Each other switch picks its <strong>root port</strong> (lowest cost path to root).</li><li>Each segment picks a <strong>designated port</strong>.</li><li>All other ports are <strong>blocked</strong>; they unblock if an active link fails.</li></ol>
+<p>Rapid STP (RSTP, 802.1w) converges in seconds instead of ~30–50 s.</p>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Data Link</h4><ul><li>Node-to-node delivery</li><li>Framing · MAC addressing · error detection · medium access</li><li>Sublayers: LLC + MAC</li></ul></div>
+<div><h4>MAC &amp; frame</h4><ul><li>48 bits = 6 bytes; first 24 = OUI</li><li>Broadcast FF:FF:FF:FF:FF:FF</li><li>Frame 64–1518 B, MTU 1500</li><li>FCS = CRC-32, error detection only</li></ul></div>
+<div><h4>Switch</h4><ul><li>Learns from SOURCE MAC</li><li>Forwards on DESTINATION MAC</li><li>Unknown/broadcast → flood (except incoming port)</li></ul></div>
+<div><h4>Domains</h4><ul><li>Switch → separates collision domains</li><li>Router / VLAN → separates broadcast domains</li><li>Hub → 1 collision domain</li></ul></div>
+<div><h4>VLAN &amp; STP</h4><ul><li>802.1Q tag, 12-bit VLAN ID</li><li>Inter-VLAN traffic needs L3</li><li>STP blocks ports to prevent loops / broadcast storms</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: MEDIUM ACCESS ================= -->
+<article class="ch" data-ch="access" hidden>
+<div class="pane notes">
+<section><h2 id="ma-why"><span class="num">3.1</span>Why do we need medium access control?</h2>
+<p>Imagine many computers on the <strong>same shared medium</strong> (a bus, a hub, or the air). If everyone transmits whenever they want, A and B might transmit simultaneously and their signals <strong>collide</strong>. We need a rule for: <em>when can I transmit?</em></p>
+<ul class="tree"><li><span class="t">Multiple access protocols</span> <span class="add">+ Added</span><ul>
+<li><span class="t">Random access</span> <em>anyone may try</em><ul><li>ALOHA (pure, slotted)</li><li>CSMA → CSMA/CD (Ethernet), CSMA/CA (Wi-Fi)</li></ul></li>
+<li><span class="t">Controlled access</span> <em>take turns</em><ul><li>Reservation · Polling · Token passing (Token Ring, FDDI)</li></ul></li>
+<li><span class="t">Channelization</span> <em>split the channel</em><ul><li>FDMA · TDMA · CDMA</li></ul></li></ul></li></ul>
+</section>
+
+<section><h2 id="ma-aloha"><span class="num">3.2</span>ALOHA <span class="add">+ Added</span></h2>
+<p>The ancestor of CSMA: transmit whenever you have data, wait for an ACK, back off randomly if none comes.</p>
+<div class="tbl"><table><thead><tr><th></th><th>Pure ALOHA</th><th>Slotted ALOHA</th></tr></thead><tbody>
+<tr><td>When to send</td><td>Any time</td><td>Only at the start of a time slot</td></tr>
+<tr><td>Vulnerable time</td><td class="n">2 × Tfr</td><td class="n">Tfr</td></tr>
+<tr><td>Throughput S</td><td class="n">G·e^(−2G)</td><td class="n">G·e^(−G)</td></tr>
+<tr><td>Max efficiency</td><td class="n">18.4% at G = 0.5</td><td class="n">36.8% at G = 1</td></tr>
+</tbody></table></div>
+<p>G = average number of frames generated per frame time.</p>
+</section>
+
+<section><h2 id="ma-csma"><span class="num">3.3</span>CSMA: Carrier Sense Multiple Access</h2>
+<ul><li><strong>Carrier Sense</strong>: before transmitting, ask "is someone already transmitting?"</li><li><strong>Multiple Access</strong>: many devices share the same medium.</li></ul>
+<p>So: <strong>Listen → if free → transmit</strong>. But there is still a problem: two devices may both check at almost the same time, both see "free", both transmit, and collide (because of propagation delay). That is where CD and CA come in.</p>
+<p><span class="add">+ Added</span> Persistence strategies: <strong>1-persistent</strong> (send immediately when idle; Ethernet), <strong>non-persistent</strong> (if busy, wait a random time then sense again), <strong>p-persistent</strong> (if idle, send with probability p; slotted channels).</p>
+</section>
+
+<section><h2 id="ma-cd"><span class="num">3.4</span>CSMA/CD: Collision Detection</h2>
+<p>Historically associated with <strong>shared, half-duplex Ethernet</strong> (hubs, coax).</p>
+<div class="wg" data-wg="flow-csmacd"></div>
+<p>The device can detect "my transmission collided" (the voltage on the wire differs from what it is sending). It then stops, sends a 32-bit <strong>jam signal</strong> <span class="add">+ Added</span> so everyone notices, and backs off.</p>
+<h3>Binary Exponential Backoff</h3>
+<p>This is the algorithmic part to remember. After collisions, devices do not retry immediately. They choose a random backoff, and the possible range <strong>doubles</strong> after each repeated collision. This reduces the chance the same devices collide again.</p>
+<div class="co formula"><span class="lb">Exact rule <span class="add">+ Added</span></span><span class="fx">After the n-th collision: pick K ∈ {0, 1, …, 2^min(n,10) − 1}</span><span class="fx">Wait K × slot time (512 bit-times = 51.2 µs at 10 Mbps)</span><span class="fx">Give up after 16 attempts</span></div>
+<div class="wg" data-wg="backoff"></div>
+<h3>Minimum frame size <span class="add">+ Added</span></h3>
+<p>A sender must still be transmitting when news of a collision gets back to it, otherwise it cannot detect the collision. So:</p>
+<div class="co formula"><span class="lb">Condition</span><span class="fx">Tt ≥ 2 × Tp &nbsp;⇒&nbsp; L_min = 2 × Tp × R</span><p style="margin:.3rem 0 0;font-size:.9rem">Classic Ethernet: 10 Mbps × 51.2 µs = 512 bits = <strong>64 bytes</strong> minimum frame. That is why short payloads are padded to 46 bytes.</p></div>
+</section>
+
+<section><h2 id="ma-ca"><span class="num">3.5</span>CSMA/CA: Collision Avoidance</h2>
+<p>Used primarily in <strong>Wi-Fi (IEEE 802.11)</strong>. Why not detect collisions? In wireless, the transmitter's own signal is far stronger than anything it could hear from others, so detecting a collision while transmitting is impractical. Wi-Fi tries to <strong>avoid</strong> collisions before they happen, and uses ACKs to learn about failures.</p>
+<div class="wg" data-wg="flow-csmaca"></div>
+<p><span class="add">+ Added</span> Wi-Fi timing: wait <strong>DIFS</strong> before contending, <strong>SIFS</strong> (shorter) before an ACK/CTS so responses get priority. The <strong>NAV</strong> (Network Allocation Vector) is a "virtual carrier sense" timer set from the duration field in RTS/CTS frames.</p>
+</section>
+
+<section><h2 id="ma-vs"><span class="num">3.6</span>CSMA/CD vs CSMA/CA</h2>
+<div class="tbl"><table><thead><tr><th>CSMA/CD</th><th>CSMA/CA</th></tr></thead><tbody>
+<tr><td>Collision Detection</td><td>Collision Avoidance</td></tr>
+<tr><td>Traditional shared Ethernet</td><td>Wi-Fi</td></tr>
+<tr><td>Detect collision during transmission</td><td>Try to avoid collision before it happens</td></tr>
+<tr><td>Collision → stop + jam + backoff</td><td>Random backoff before sending + ACK</td></tr>
+<tr><td>Half-duplex Ethernet</td><td>Wireless LAN</td></tr>
+<tr><td>Backoff after a collision</td><td>Backoff even when the channel is idle</td></tr>
+</tbody></table></div>
+<div class="co trap"><span class="lb">Very important modern note</span><p>Modern switched Ethernet is <strong>full-duplex</strong>, so collisions don't occur on a dedicated switch link. CSMA/CD is mainly a historical/legacy concept today, but it remains important for interviews and for understanding Ethernet.</p></div>
+</section>
+
+<section><h2 id="ma-hidden"><span class="num">3.7</span>Hidden terminal problem and RTS/CTS</h2>
+<p>A and C cannot hear each other, but both can reach B. A thinks "channel is free", C thinks "channel is free", both transmit to B → <strong>collision at B</strong>.</p>
+<div class="wg" data-wg="hidden"></div>
+<p>Wi-Fi can use <strong>RTS (Request To Send)</strong> and <strong>CTS (Clear To Send)</strong>. Other nearby devices that hear the CTS stay silent for the announced duration.</p>
+<div class="wg" data-wg="seq-rtscts"></div>
+<p><span class="add">+ Added</span> <strong>Exposed terminal problem</strong>: the opposite case. B is sending to A; C hears B and wrongly stays silent, even though C's transmission to D would not interfere at A. Capacity is wasted.</p>
+</section>
+
+<section><h2 id="ma-big"><span class="num">3.8</span>One big picture</h2>
+<ul class="tree"><li><span class="t">Data Link Layer</span><ul><li>LLC</li><li><span class="t">MAC</span><ul><li>MAC Address</li><li>Ethernet<ul><li>Frame</li></ul></li><li>Medium Access<ul><li><span class="t">CSMA/CD</span><ul><li>Binary Exponential Backoff</li></ul></li><li><span class="t">CSMA/CA</span><ul><li>Random Backoff</li><li>ACK</li><li>RTS/CTS</li></ul></li></ul></li></ul></li></ul></li></ul>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>ALOHA</h4><ul><li>Pure: 18.4% (G = 0.5), vulnerable 2Tfr</li><li>Slotted: 36.8% (G = 1), vulnerable Tfr</li></ul></div>
+<div><h4>CSMA/CD</h4><ul><li>Listen → send → detect → jam → backoff</li><li>BEB: K ∈ [0, 2^min(n,10)−1], give up at 16</li><li>Min frame: Tt ≥ 2Tp → 64 B</li><li>Legacy half-duplex Ethernet</li></ul></div>
+<div><h4>CSMA/CA</h4><ul><li>Wi-Fi (802.11)</li><li>Sense → backoff → send → wait ACK</li><li>Can't detect collisions over the air</li></ul></div>
+<div><h4>Hidden terminal</h4><ul><li>A and C can't hear each other → collide at B</li><li>Fix: RTS → CTS → DATA → ACK</li><li>Exposed terminal = needless silence</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: ERRORS ================= -->
+<article class="ch" data-ch="errors" hidden>
+<div class="pane notes">
+<section><h2 id="err-vs"><span class="num">4.1</span>Error detection vs error correction</h2>
+<p>When data travels through a network, bits can get corrupted: sender sends <code>10110101</code>, receiver gets <code>10100101</code>.</p>
+<div class="vs"><div><h4>Detection</h4>Receiver knows "something is wrong", but not what the correct data was. Fix = ask again (retransmission).</div><div><h4>Correction</h4>Receiver knows something is wrong <strong>and</strong> can recover the correct data (forward error correction, FEC).</div></div>
+<p><span class="add">+ Added</span> <strong>Single-bit error</strong>: one bit flipped. <strong>Burst error</strong>: several consecutive bits corrupted (length = first to last corrupted bit). Bursts are more common in real links, which is why CRC matters.</p>
+</section>
+
+<section><h2 id="err-parity"><span class="num">4.2</span>Parity bit</h2>
+<p>The simplest error detection technique: add one extra bit so the number of 1s is <strong>even</strong> (even parity) or <strong>odd</strong> (odd parity).</p>
+<p>Example: data <code>1011001</code> has four 1s. With even parity, append 0 → <code>10110010</code>, total still even.</p>
+<div class="wg" data-wg="parity"></div>
+<div class="co trap"><span class="lb">Problem</span><p>Parity detects any <strong>odd</strong> number of bit errors, but if <strong>two</strong> bits flip the count stays even and the error is missed. <span class="add">+ Added</span> 2-D parity (row + column parity) can detect more patterns and even correct a single-bit error.</p></div>
+</section>
+
+<section><h2 id="err-checksum"><span class="num">4.3</span>Checksum</h2>
+<div class="flow"><span>Divide data into fixed-size words (16-bit for the Internet checksum)</span><span>Add them with 1's complement arithmetic (wrap carries around)</span><span>Complement the result → checksum</span><span>Receiver adds everything including checksum → all 1s (complement = 0) means OK</span></div>
+<p>If the result doesn't match: error detected. Checksum is for <strong>detection, not correction</strong>. <span class="add">+ Added</span> The 16-bit Internet checksum is used in the <strong>IPv4 header, TCP, UDP and ICMP</strong>. It is weaker than CRC (misses reordered words, for example) but cheap in software.</p>
+<div class="wg" data-wg="checksum"></div>
+</section>
+
+<section><h2 id="err-crc"><span class="num">4.4</span>CRC: Cyclic Redundancy Check</h2>
+<p>Very important for placements. CRC uses <strong>polynomial (modulo-2) division</strong>, which is just XOR without carries.</p>
+<div class="vs">
+<div><h4>Sender</h4><ol><li>Generator has degree r (r+1 bits)</li><li>Append r zeros to the data</li><li>Divide by the generator using XOR</li><li>Remainder (r bits) = CRC</li><li>Transmit data + CRC</li></ol></div>
+<div><h4>Receiver</h4><ol><li>Divide received data + CRC by the same generator</li><li>Remainder = 0 → likely no error</li><li>Remainder ≠ 0 → error</li></ol></div>
+</div>
+<p>Worked example: data <code>101101</code>, generator <code>1101</code> (degree 3). Append 3 zeros → <code>101101000</code>, divide → remainder <strong><code>010</code></strong>. Transmit <strong><code>101101010</code></strong>. Try your own below; every XOR step is shown.</p>
+<div class="wg" data-wg="crc"></div>
+<p><strong>Why CRC is popular:</strong> it detects all single-bit errors, all double-bit errors (with a good generator), all odd numbers of errors (if the generator has factor x+1), and <strong>all burst errors of length ≤ r</strong>. Ethernet's FCS is CRC-32.</p>
+</section>
+
+<section><h2 id="err-hamming"><span class="num">4.5</span>Hamming code: error correction</h2>
+<p>Hamming code can detect and correct certain bit errors. Basic Hamming code <strong>corrects 1-bit errors</strong> and (with an extra overall parity bit, SECDED) <strong>detects 2-bit errors</strong>.</p>
+<p>Parity bits sit at positions that are <strong>powers of 2</strong>: 1, 2, 4, 8, 16… For Hamming(7,4): <code>P1 P2 D1 P4 D2 D3 D4</code>.</p>
+<ul><li>P1 checks positions with bit 0 set: 1, 3, 5, 7</li><li>P2 checks positions with bit 1 set: 2, 3, 6, 7</li><li>P4 checks positions with bit 2 set: 4, 5, 6, 7</li></ul>
+<p>At the receiver, recomputing the checks gives a <strong>syndrome</strong>. The syndrome, read as a binary number, <strong>is the position of the wrong bit</strong>. Example: syndrome = 101₂ = 5 → bit 5 is wrong → flip bit 5. Encode 4 bits below, then click any bit to corrupt it.</p>
+<div class="wg" data-wg="hamming"></div>
+<div class="co formula"><span class="lb">Formulas <span class="add">+ Added</span></span>
+<span class="fx">Parity bits r for m data bits: 2^r ≥ m + r + 1</span>
+<span class="fx">To detect d errors: d_min ≥ d + 1</span>
+<span class="fx">To correct t errors: d_min ≥ 2t + 1</span>
+<p style="margin:.3rem 0 0;font-size:.9rem">Hamming distance = number of positions where two codewords differ (XOR, count 1s). Example m = 7 → r = 4 (2⁴ = 16 ≥ 12).</p></div>
+</section>
+
+<section><h2 id="err-summary"><span class="num">4.6</span>Detection vs correction summary</h2>
+<div class="tbl"><table><thead><tr><th>Technique</th><th>Purpose</th><th>Where used</th></tr></thead><tbody>
+<tr><td>Parity</td><td>Simple detection</td><td>Serial links, memory</td></tr>
+<tr><td>Checksum</td><td>Detection</td><td>IP header, TCP, UDP, ICMP</td></tr>
+<tr><td>CRC</td><td>Strong detection (polynomial / XOR division)</td><td>Ethernet FCS, Wi-Fi, storage</td></tr>
+<tr><td>Hamming code</td><td>Correction (parity bits + syndrome)</td><td>ECC memory</td></tr>
+</tbody></table></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Detection</h4><ul><li>Parity → misses even # of errors</li><li>Checksum → 1's complement sum, IP/TCP/UDP</li><li>CRC → XOR division, append r zeros, Ethernet FCS</li><li>CRC catches all bursts ≤ r</li></ul></div>
+<div><h4>Correction</h4><ul><li>Hamming: parity at 1, 2, 4, 8…</li><li>Syndrome = position of bad bit</li><li>2^r ≥ m + r + 1</li></ul></div>
+<div><h4>Distance</h4><ul><li>Detect d → d_min ≥ d+1</li><li>Correct t → d_min ≥ 2t+1</li></ul></div>
+</div>
+</div>
+</article>

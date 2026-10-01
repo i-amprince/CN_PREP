@@ -1,0 +1,284 @@
+
+<!-- ================= CH: IP / ARP / NAT ================= -->
+<article class="ch" data-ch="ip" hidden>
+<div class="pane notes">
+<p>Now we move from local delivery (MAC) to delivery <strong>between different networks</strong> (IP).</p>
+<section><h2 id="ip-job"><span class="num">5.1</span>What does the Network layer do?</h2>
+<ul><li>Logical addressing → IP addresses</li><li>Routing (choosing the path)</li><li>Packet forwarding</li><li>Internetwork communication (and fragmentation when needed)</li></ul>
+<pre class="dg">Data Link → "Which device on this local network?"
+Network   → "Which network should this packet go to?"
+
+Laptop → Home Router → ISP Router → Google Server</pre>
+</section>
+
+<section><h2 id="ip-addr"><span class="num">5.2</span>IP address: IPv4 and IPv6</h2>
+<div class="vs">
+<div><h4>IPv4</h4><code>192.168.1.10</code><ul><li>32 bits = 4 octets of 8 bits</li><li>Each octet 0–255</li><li>~4.3 billion addresses (2³²)</li></ul></div>
+<div><h4>IPv6</h4><code>2001:0db8:85a3::8a2e:0370:7334</code><ul><li>128 bits, 8 groups of 16-bit hex</li><li>Main reason: IPv4 address space ran out</li><li>Details in the Subnetting chapter</li></ul></div>
+</div>
+<h3>Network part vs host part</h3>
+<p><code>192.168.1.10/24</code>: <code>/24</code> means the first 24 bits are the <strong>network</strong>, the last 8 bits are the <strong>host</strong>. So network = 192.168.1.0, host = 10.</p>
+<div class="tbl"><table><tbody>
+<tr><td>Network address</td><td class="n">192.168.1.0</td><td>host bits all 0, not assignable</td></tr>
+<tr><td>First usable</td><td class="n">192.168.1.1</td><td>often the gateway</td></tr>
+<tr><td>Last usable</td><td class="n">192.168.1.254</td><td></td></tr>
+<tr><td>Broadcast</td><td class="n">192.168.1.255</td><td>host bits all 1, not assignable</td></tr>
+</tbody></table></div>
+<p>This leads to subnetting, covered fully in the next chapter (with a calculator).</p>
+</section>
+
+<section><h2 id="ip-private"><span class="num">5.3</span>Private vs public IP</h2>
+<div class="vs">
+<div><h4>Private (RFC 1918)</h4>Used inside local networks, not routed on the Internet.<ul><li><code>10.0.0.0/8</code></li><li><code>172.16.0.0/12</code> (172.16–172.31)</li><li><code>192.168.0.0/16</code></li></ul></div>
+<div><h4>Public</h4>Globally unique, used on the public Internet. Your home devices don't each need one because of NAT.</div>
+</div>
+<p><span class="add">+ Added</span> Other special ranges: <code>127.0.0.0/8</code> loopback (127.0.0.1 = localhost), <code>169.254.0.0/16</code> link-local / APIPA (self-assigned when DHCP fails), <code>0.0.0.0</code> "this host / any", <code>255.255.255.255</code> limited broadcast, <code>100.64.0.0/10</code> carrier-grade NAT.</p>
+</section>
+
+<section><h2 id="ip-nat"><span class="num">5.4</span>NAT: Network Address Translation</h2>
+<p>Your laptop (192.168.1.10) sends with source 192.168.1.10. The router rewrites the source to its own public address and remembers the mapping in a <strong>translation table</strong> so replies find their way back.</p>
+<div class="wg" data-wg="nat"></div>
+<p><strong>Why NAT?</strong> It lets many private IPs share one public IP and helps <strong>conserve IPv4 addresses</strong>.</p>
+<div class="co added"><span class="lb">+ Added · NAT types and side-effects</span><ul>
+<li><strong>Static NAT</strong>: one private ↔ one public (fixed). For servers.</li>
+<li><strong>Dynamic NAT</strong>: private → any free public address from a pool.</li>
+<li><strong>PAT / NAPT / "NAT overload"</strong>: many private → one public, distinguished by <strong>port</strong>. This is what home routers do.</li>
+<li>Side-effects: breaks true end-to-end connectivity; inbound connections need <strong>port forwarding</strong>; complicates peer-to-peer (needs STUN/TURN); NAT is <em>not</em> a security feature, though it hides internal addresses. NAT is technically a Layer-3/4 hack (it rewrites ports too).</li></ul></div>
+</section>
+
+<section><h2 id="ip-arp"><span class="num">5.5</span>ARP: Address Resolution Protocol (very important)</h2>
+<p>Purpose: find the <strong>MAC address</strong> for an <strong>IPv4 address</strong> on the local network. A (192.168.1.10, AA-AA) wants to talk to B (192.168.1.20, BB-BB). A knows B's IP, but Ethernet needs B's MAC.</p>
+<div class="wg" data-wg="seq-arp"></div>
+<div class="tbl"><table><thead><tr><th>Message</th><th>Sent as</th><th>Why</th></tr></thead><tbody>
+<tr><td>ARP Request "Who has 192.168.1.20?"</td><td><strong>Broadcast</strong> (FF:FF:FF:FF:FF:FF)</td><td>A doesn't know B's MAC</td></tr>
+<tr><td>ARP Reply "192.168.1.20 is BB-BB"</td><td><strong>Unicast</strong></td><td>B now knows exactly who asked</td></tr>
+</tbody></table></div>
+<p>A stores <code>192.168.1.20 → BB-BB</code> in its <strong>ARP cache</strong> (entries expire after a while). B also caches A's mapping from the request.</p>
+<div class="co added"><span class="lb">+ Added · ARP extras</span><ul>
+<li>ARP sits between L2 and L3 (often called "Layer 2.5"); Ethernet type 0x0806.</li>
+<li><strong>Gratuitous ARP</strong>: a host announces its own IP→MAC (after boot / IP change), also used to detect duplicate IPs.</li>
+<li><strong>ARP spoofing / poisoning</strong>: attacker sends fake replies ("I am the gateway") to become a man-in-the-middle. ARP has no authentication. Defence: Dynamic ARP Inspection, static entries.</li>
+<li><strong>RARP</strong> (MAC → IP, obsolete, replaced by BOOTP/DHCP). <strong>Proxy ARP</strong>: a router answers on behalf of another network.</li>
+<li>IPv6 has no ARP; it uses <strong>NDP</strong> (Neighbor Discovery, ICMPv6).</li></ul></div>
+</section>
+
+<section><h2 id="ip-gateway"><span class="num">5.6</span>What if the destination is outside my network?</h2>
+<p>This is VERY important. Laptop 192.168.1.10/24 wants Google at 142.x.x.x. The laptop ANDs both IPs with its mask, sees Google is <strong>not in its subnet</strong>, so it <strong>does not ARP for Google's MAC</strong>. It ARPs for the <strong>default gateway</strong> (192.168.1.1) and sends the frame to the router's MAC.</p>
+<div class="co key"><span class="lb">Key concept</span><p>For an external destination, your host sends the frame to the <strong>router's MAC</strong>, not the remote server's MAC. The <strong>IP destination</strong> is still the server.</p></div>
+</section>
+
+<section><h2 id="ip-hops"><span class="num">5.7</span>MAC changes, IP usually doesn't</h2>
+<p>Step through a packet going Laptop → Router 1 → Router 2 → Server. Watch which header fields change on each link. Turn NAT on to see the one exception.</p>
+<div class="wg" data-wg="hops"></div>
+<p>This is one of the best ways to distinguish Layer 2 and Layer 3: <strong>MAC addresses are rewritten at every hop; source and destination IP normally stay the same; TTL drops by 1 at each router.</strong></p>
+</section>
+
+<section><h2 id="ip-routing"><span class="num">5.8</span>Routing table, default route and longest prefix match</h2>
+<p>A router receives an IP packet, looks at the <strong>destination IP</strong>, and checks its routing table:</p>
+<div class="tbl"><table><thead><tr><th>Destination</th><th>Next hop</th></tr></thead><tbody>
+<tr><td class="n">192.168.1.0/24</td><td>Direct (connected)</td></tr><tr><td class="n">10.0.0.0/8</td><td>Router A</td></tr><tr><td class="n">172.16.0.0/16</td><td>Router B</td></tr><tr><td class="n">0.0.0.0/0</td><td>Router C (default)</td></tr></tbody></table></div>
+<p><strong>Default route</strong> <code>0.0.0.0/0</code> means "if nothing more specific matches, send it here" (usually toward the ISP). It matches everything because it has zero network bits.</p>
+<p><strong>Longest Prefix Match</strong>: if several entries match, the <strong>most specific</strong> (longest prefix) wins: /24 &gt; /16 &gt; /8 &gt; /0. Test it:</p>
+<div class="wg" data-wg="lpm"></div>
+</section>
+
+<section><h2 id="ip-ttl"><span class="num">5.9</span>TTL: Time To Live</h2>
+<p>Every IPv4 packet has an 8-bit TTL field (IPv6 calls it <strong>Hop Limit</strong>). At each router: <code>TTL = TTL − 1</code>. If it reaches 0, the packet is discarded and the router sends an ICMP "Time Exceeded" back. Purpose: stop packets circulating forever in routing loops (A → B → C → A → …). Typical starting values: 64 (Linux/macOS), 128 (Windows), 255.</p>
+<div class="co trap"><span class="lb">Trap</span><p>IP TTL counts <strong>hops</strong>. DNS TTL is a <strong>cache lifetime in seconds</strong>. Same name, different things.</p></div>
+</section>
+
+<section><h2 id="ip-icmp"><span class="num">5.10</span>ICMP</h2>
+<p>Internet Control Message Protocol: network diagnostic and error messages. It is carried <strong>inside IP</strong> (protocol number 1), so it is considered a Network-layer protocol.</p>
+<div class="tbl"><table><thead><tr><th>Type <span class="add">+ Added</span></th><th>Message</th><th>Used by</th></tr></thead><tbody>
+<tr><td class="n">8</td><td>Echo Request</td><td>ping</td></tr><tr><td class="n">0</td><td>Echo Reply</td><td>ping</td></tr>
+<tr><td class="n">3</td><td>Destination Unreachable (host/port/net; code 4 = fragmentation needed)</td><td>errors, Path MTU Discovery</td></tr>
+<tr><td class="n">11</td><td>Time Exceeded (TTL hit 0)</td><td>traceroute</td></tr>
+<tr><td class="n">5</td><td>Redirect</td><td>better gateway hint</td></tr></tbody></table></div>
+<p><strong>traceroute</strong> uses TTL manipulation: send with TTL = 1 → first router replies "Time Exceeded" (revealing itself); TTL = 2 → second router; and so on until the destination answers. Linux traceroute sends UDP probes, Windows <code>tracert</code> sends ICMP echo.</p>
+<div class="wg" data-wg="traceroute"></div>
+</section>
+
+<section><h2 id="ip-scenario"><span class="num">5.11</span>Interview scenario: PC opens google.com</h2>
+<p>"Your PC wants to access google.com. Google is outside your local network. What happens at Layer 2 and Layer 3?"</p>
+<div class="flow"><span>DNS gives Google's IP</span><span>PC checks: destination is outside my subnet</span><span>Find default gateway</span><span>ARP → gateway's MAC</span><span>IP packet: Src IP = PC, Dst IP = Google</span><span>Ethernet frame: Src MAC = PC, Dst MAC = Router</span><span>Router forwards; MAC addresses change at every hop</span><span>IP packet continues toward Google (TTL −1 per router)</span></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Addressing</h4><ul><li>IPv4 32-bit, IPv6 128-bit</li><li>Private: 10/8, 172.16/12, 192.168/16</li><li>127/8 loopback, 169.254/16 APIPA</li></ul></div>
+<div><h4>ARP</h4><ul><li>IPv4 → MAC on local link</li><li>Request → broadcast; Reply → unicast</li><li>Remote destination → ARP for gateway</li><li>Spoofing → MITM; IPv6 uses NDP</li></ul></div>
+<div><h4>Hops</h4><ul><li>MAC changes every hop</li><li>IP stays end-to-end (except NAT)</li><li>TTL −1 per router, 0 → drop + ICMP</li></ul></div>
+<div><h4>Routing</h4><ul><li>0.0.0.0/0 = default route</li><li>Longest prefix wins: /24 &gt; /16 &gt; /8</li></ul></div>
+<div><h4>NAT &amp; ICMP</h4><ul><li>PAT: many private → 1 public by port</li><li>ping → ICMP Echo Request (8)/Reply (0)</li><li>traceroute → TTL + ICMP Time Exceeded (11)</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: SUBNETTING ================= -->
+<article class="ch" data-ch="subnet" hidden>
+<div class="pane notes">
+<div class="co added"><span class="lb">+ Added chapter</span><p>Your notes said subnetting would be "covered separately and properly". Here it is, plus IPv4 classes, the IPv4 header, fragmentation and IPv6.</p></div>
+<section><h2 id="sn-classes"><span class="num">6.1</span>Classful addressing (history, still asked)</h2>
+<div class="tbl"><table><thead><tr><th>Class</th><th>First octet</th><th>Leading bits</th><th>Default mask</th><th>Use</th></tr></thead><tbody>
+<tr><td>A</td><td class="n">1–126</td><td class="n">0</td><td class="n">/8 · 255.0.0.0</td><td>Huge networks (16.7M hosts)</td></tr>
+<tr><td>B</td><td class="n">128–191</td><td class="n">10</td><td class="n">/16 · 255.255.0.0</td><td>Medium (65,534 hosts)</td></tr>
+<tr><td>C</td><td class="n">192–223</td><td class="n">110</td><td class="n">/24 · 255.255.255.0</td><td>Small (254 hosts)</td></tr>
+<tr><td>D</td><td class="n">224–239</td><td class="n">1110</td><td>none</td><td>Multicast</td></tr>
+<tr><td>E</td><td class="n">240–255</td><td class="n">1111</td><td>none</td><td>Reserved / experimental</td></tr>
+</tbody></table></div>
+<p>127 is reserved for loopback (that's why Class A ends at 126). Classful addressing wasted addresses, so it was replaced by <strong>CIDR</strong> (Classless Inter-Domain Routing) in 1993: any prefix length <code>/n</code> is allowed.</p>
+</section>
+
+<section><h2 id="sn-basics"><span class="num">6.2</span>Subnet mask and the core formulas</h2>
+<p>A subnet mask has 1s for network bits and 0s for host bits. <code>/26</code> = 26 ones = <code>255.255.255.192</code>. Network address = <strong>IP AND mask</strong>. Broadcast = network OR (inverted mask).</p>
+<div class="co formula"><span class="lb">Formulas</span>
+<span class="fx">Host bits h = 32 − prefix</span>
+<span class="fx">Total addresses = 2^h</span>
+<span class="fx">Usable hosts = 2^h − 2 &nbsp;<em>(minus network + broadcast)</em></span>
+<span class="fx">Subnets from borrowing s bits = 2^s</span>
+<span class="fx">Block size ("magic number") = 256 − mask octet</span></div>
+<div class="tbl"><table><thead><tr><th>Prefix</th><th>Mask</th><th class="n">Block</th><th class="n">Usable hosts</th></tr></thead><tbody>
+<tr><td>/24</td><td class="n">255.255.255.0</td><td class="n">256</td><td class="n">254</td></tr>
+<tr><td>/25</td><td class="n">255.255.255.128</td><td class="n">128</td><td class="n">126</td></tr>
+<tr><td>/26</td><td class="n">255.255.255.192</td><td class="n">64</td><td class="n">62</td></tr>
+<tr><td>/27</td><td class="n">255.255.255.224</td><td class="n">32</td><td class="n">30</td></tr>
+<tr><td>/28</td><td class="n">255.255.255.240</td><td class="n">16</td><td class="n">14</td></tr>
+<tr><td>/29</td><td class="n">255.255.255.248</td><td class="n">8</td><td class="n">6</td></tr>
+<tr><td>/30</td><td class="n">255.255.255.252</td><td class="n">4</td><td class="n">2 (point-to-point links)</td></tr>
+<tr><td>/31</td><td class="n">255.255.255.254</td><td class="n">2</td><td class="n">2 (special case, P2P, RFC 3021)</td></tr>
+<tr><td>/32</td><td class="n">255.255.255.255</td><td class="n">1</td><td class="n">single host route</td></tr>
+</tbody></table></div>
+</section>
+
+<section><h2 id="sn-calc"><span class="num">6.3</span>Subnet calculator</h2>
+<p>Type any IP/prefix. The binary row shows network bits (coloured) vs host bits.</p>
+<div class="wg" data-wg="subnetcalc"></div>
+</section>
+
+<section><h2 id="sn-method"><span class="num">6.4</span>The fast method (magic number)</h2>
+<p>Question: <em>Which subnet does 192.168.10.77/26 belong to?</em></p>
+<ol><li>/26 → mask octet 192 → block = 256 − 192 = <strong>64</strong>.</li><li>Subnets start at multiples of 64: 0, 64, 128, 192.</li><li>77 falls in 64–127 → network <strong>192.168.10.64</strong>, broadcast <strong>192.168.10.127</strong>.</li><li>Usable: .65 – .126 (62 hosts).</li></ol>
+<p>Question: <em>Split 192.168.1.0/24 into 4 equal subnets.</em> Borrow 2 bits (2² = 4) → /26: .0, .64, .128, .192, each 62 hosts. Use the splitter:</p>
+<div class="wg" data-wg="subnetsplit"></div>
+<h3>VLSM (Variable Length Subnet Masking)</h3>
+<p>Give each subnet only the size it needs. Allocate <strong>largest first</strong>. Example from 192.168.1.0/24 for needs of 100, 50, 20, 2 hosts: /25 (126) → .0/25, /26 (62) → .128/26, /27 (30) → .192/27, /30 (2) → .224/30.</p>
+<h3>Supernetting / route aggregation</h3>
+<p>Combine contiguous networks into one shorter prefix: 192.168.0.0/24 + 192.168.1.0/24 + 192.168.2.0/24 + 192.168.3.0/24 = <strong>192.168.0.0/22</strong>. Smaller routing tables.</p>
+</section>
+
+<section><h2 id="sn-header"><span class="num">6.5</span>IPv4 header</h2>
+<div class="wg" data-wg="ipv4hdr"></div>
+<ul><li>Header is <strong>20 bytes minimum, 60 bytes max</strong> (IHL counts 4-byte words: 5–15).</li><li><strong>Total length</strong> 16-bit → max packet 65,535 bytes.</li><li><strong>Protocol</strong>: 1 = ICMP, 6 = TCP, 17 = UDP, 89 = OSPF.</li><li><strong>Header checksum</strong> covers only the header and is recomputed at every router (because TTL changes).</li></ul>
+</section>
+
+<section><h2 id="sn-frag"><span class="num">6.6</span>Fragmentation</h2>
+<p>If a packet is bigger than the next link's MTU, an IPv4 router splits it into fragments; only the <strong>destination host</strong> reassembles them.</p>
+<ul><li><strong>Identification</strong>: same for all fragments of one packet.</li><li><strong>MF</strong> (More Fragments) = 1 on all but the last fragment. <strong>DF</strong> (Don't Fragment) = 1 → drop and send ICMP "fragmentation needed" (used by Path MTU Discovery).</li><li><strong>Fragment offset</strong> is in units of <strong>8 bytes</strong>, so each fragment's data (except the last) must be a multiple of 8.</li></ul>
+<div class="wg" data-wg="frag"></div>
+</section>
+
+<section><h2 id="sn-v6"><span class="num">6.7</span>IPv6 essentials</h2>
+<div class="tbl"><table><thead><tr><th>Feature</th><th>IPv4</th><th>IPv6</th></tr></thead><tbody>
+<tr><td>Address size</td><td>32-bit</td><td>128-bit</td></tr>
+<tr><td>Header</td><td>20–60 B, variable</td><td>40 B fixed + extension headers</td></tr>
+<tr><td>Checksum</td><td>Header checksum</td><td>None (L2/L4 already check)</td></tr>
+<tr><td>Fragmentation</td><td>Routers and hosts</td><td>Source host only</td></tr>
+<tr><td>Broadcast</td><td>Yes</td><td>No; multicast + anycast instead</td></tr>
+<tr><td>Address resolution</td><td>ARP</td><td>NDP (ICMPv6)</td></tr>
+<tr><td>Configuration</td><td>Manual / DHCP</td><td>SLAAC or DHCPv6</td></tr>
+<tr><td>TTL</td><td>TTL</td><td>Hop Limit</td></tr>
+<tr><td>NAT</td><td>Common</td><td>Not needed (plenty of addresses)</td></tr>
+</tbody></table></div>
+<p><strong>Shortening rules</strong>: drop leading zeros in a group (<code>0db8 → db8</code>); replace <strong>one</strong> run of all-zero groups with <code>::</code> (only once per address). <code>2001:0db8:0000:0000:0000:0000:0000:0001</code> → <code>2001:db8::1</code>. Special: <code>::1</code> loopback, <code>fe80::/10</code> link-local, <code>ff00::/8</code> multicast, <code>2000::/3</code> global unicast.</p>
+<p>Transition: <strong>dual stack</strong> (both), <strong>tunnelling</strong> (6in4), <strong>translation</strong> (NAT64).</p>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Classes</h4><ul><li>A 1–126 /8 · B 128–191 /16 · C 192–223 /24</li><li>D 224–239 multicast · E 240–255</li><li>CIDR replaced classes</li></ul></div>
+<div><h4>Formulas</h4><ul><li>Hosts = 2^(32−n) − 2</li><li>Block = 256 − mask octet</li><li>Network = IP AND mask</li><li>/30 → 2 hosts (P2P)</li></ul></div>
+<div><h4>IPv4 header</h4><ul><li>20–60 B; protocol 1/6/17</li><li>Checksum recomputed per hop</li><li>Fragment offset ×8 bytes; MF, DF flags</li><li>Reassembly only at destination</li></ul></div>
+<div><h4>IPv6</h4><ul><li>128-bit, 40 B fixed header</li><li>No broadcast, no header checksum, no router fragmentation</li><li>NDP replaces ARP; :: only once</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: ROUTING ================= -->
+<article class="ch" data-ch="routing" hidden>
+<div class="pane notes">
+<p>The algorithm-heavy part. Interviewers connect routing tables → routing algorithms → Dijkstra/Bellman-Ford → RIP/OSPF/BGP.</p>
+<section><h2 id="rt-what"><span class="num">7.1</span>Routing vs forwarding</h2>
+<p><strong>Routing</strong> = finding a path from a source network to a destination network (A → R1 → R2 → R3 → B). It's the control plane, slow, runs routing protocols.</p>
+<p><strong>Forwarding</strong> = actually sending each arriving packet out the right interface. It's the data plane, per-packet, fast.</p>
+<div class="vs"><div><h4>Routing</h4>"Which path?" Builds the table.</div><div><h4>Forwarding</h4>"Send it through this interface." Uses the table.</div></div>
+<div class="tbl"><table><thead><tr><th>Destination</th><th>Next hop</th><th>Interface</th></tr></thead><tbody>
+<tr><td class="n">192.168.1.0/24</td><td>Direct</td><td>eth0</td></tr><tr><td class="n">10.0.0.0/8</td><td class="n">192.168.2.1</td><td>eth1</td></tr><tr><td class="n">172.16.0.0/16</td><td class="n">192.168.3.1</td><td>eth2</td></tr><tr><td class="n">0.0.0.0/0</td><td>ISP</td><td>eth3</td></tr></tbody></table></div>
+<div class="flow h"><span>Destination IP</span><span>Check table</span><span>Longest prefix match</span><span>Next hop</span><span>Forward</span></div>
+</section>
+
+<section><h2 id="rt-static"><span class="num">7.2</span>Static vs dynamic routing</h2>
+<div class="vs">
+<div><h4>Static</h4>Admin configures routes manually.<ul><li>✔ Simple, predictable, no protocol overhead, secure</li><li>✘ Doesn't adapt to failures</li><li>✘ Hard to maintain in large networks</li></ul></div>
+<div><h4>Dynamic</h4>Routers exchange information and compute routes automatically.<ul><li>✔ Adapts to failures and changes</li><li>✘ CPU/bandwidth overhead, convergence time</li><li>Examples: RIP, OSPF, BGP</li></ul></div>
+</div>
+</section>
+
+<section><h2 id="rt-dv"><span class="num">7.3</span>Distance Vector and Bellman-Ford</h2>
+<p>Each router knows "how far is each destination, and through which neighbour?" It does <strong>not</strong> have the full topology; it periodically shares its whole table <strong>with neighbours only</strong>. People call it "routing by rumour".</p>
+<div class="co formula"><span class="lb">Bellman-Ford equation</span><span class="fx">D_x(y) = min over neighbours v of { c(x,v) + D_v(y) }</span><p style="margin:.3rem 0 0;font-size:.9rem">distance to destination = cost to neighbour + neighbour's distance to destination</p></div>
+<pre class="dg">A ----1---- B ----2---- C
+ \                     /
+  ---------5-----------
+
+A → C direct   = 5
+A → C via B    = 1 + 2 = <b>3</b>  ✔ chosen</pre>
+<h3>Count-to-infinity</h3>
+<p>A — B — C. A reaches C via B. Now C fails. B loses its direct route, but A still advertises "I can reach C in 2". B believes it (cost 3 via A), A then updates to 4 via B, and so on: <strong>2 → 3 → 4 → 5 → …</strong> until infinity (16 in RIP). Bad news travels slowly; good news travels fast.</p>
+<div class="wg" data-wg="cti"></div>
+<ul><li><strong>Split horizon</strong>: don't advertise a route back out the interface you learned it from.</li><li><strong>Poison reverse</strong>: do advertise it back, but with an infinite metric.</li><li><span class="add">+ Added</span> <strong>Route poisoning</strong> (advertise failed route as ∞ immediately), <strong>triggered updates</strong> (send on change, not just every 30 s), <strong>hold-down timers</strong> (ignore worse news for a while). Split horizon does not fix loops involving 3+ routers.</li></ul>
+</section>
+
+<section><h2 id="rt-rip"><span class="num">7.4</span>RIP: Routing Information Protocol</h2>
+<p>Distance Vector protocol. <strong>Metric = hop count.</strong> Maximum usable = <strong>15</strong>, <strong>16 = infinity / unreachable</strong> (common MCQ). That limits RIP to small networks.</p>
+<p><span class="add">+ Added</span> Sends its full table every <strong>30 s</strong>; runs over <strong>UDP port 520</strong>. RIPv1 is classful and broadcasts; RIPv2 is classless (sends masks), uses multicast 224.0.0.9 and supports authentication. RIPng is for IPv6.</p>
+</section>
+
+<section><h2 id="rt-ls"><span class="num">7.5</span>Link State and Dijkstra</h2>
+<p>Each router floods <strong>Link-State Advertisements (LSAs)</strong> describing its own links to <strong>every</strong> router. Everyone builds the same full topology map (LSDB), then each runs <strong>Dijkstra</strong> to compute its own shortest-path tree.</p>
+<p>Dijkstra repeatedly picks the <strong>closest unvisited node</strong> and relaxes its neighbours. Step through it:</p>
+<div class="wg" data-wg="dijkstra"></div>
+<p>Your notes' example: A–B 2, B–D 1, A–C 5, C–D 2. Start A: A = 0, B = 2, C = 5, D = ∞. Pick B (2) → D = 2 + 1 = 3. Pick D (3) → C via D = 5, no improvement. Path A → B → D costs 3.</p>
+<div class="tbl"><table><thead><tr><th>Dijkstra</th><th>Bellman-Ford</th></tr></thead><tbody>
+<tr><td>Link State</td><td>Distance Vector</td></tr><tr><td>Uses complete topology</td><td>Uses neighbour information</td></tr><tr><td>Greedy</td><td>Relaxation, iterative (V−1 rounds)</td></tr><tr><td>OSPF, IS-IS</td><td>RIP</td></tr><tr><td>No negative edges</td><td>Handles negative edges (detects negative cycles)</td></tr><tr><td>O((V+E) log V) with heap</td><td>O(V·E)</td></tr></tbody></table></div>
+</section>
+
+<section><h2 id="rt-ospf"><span class="num">7.6</span>OSPF: Open Shortest Path First</h2>
+<p>Link State protocol using Dijkstra's SPF. <strong>Metric = cost</strong>, generally based on bandwidth (cost = reference bandwidth / interface bandwidth; default reference 100 Mbps). Used <strong>within an autonomous system</strong>.</p>
+<p><span class="add">+ Added</span> Runs directly over IP (<strong>protocol 89</strong>, no TCP/UDP). Uses <strong>Hello</strong> packets to find neighbours, sends updates only on change, supports VLSM/CIDR and authentication. Large networks are split into <strong>areas</strong>; all areas connect to backbone <strong>Area 0</strong>, which keeps LSA flooding and SPF runs small. On multi-access links a DR/BDR (designated router) reduces adjacencies.</p>
+</section>
+
+<section><h2 id="rt-as"><span class="num">7.7</span>Autonomous systems, IGP vs EGP, BGP</h2>
+<p>An <strong>Autonomous System (AS)</strong> is a network or group of networks under one administrative control and routing policy (an ISP, a big company, Google). Each has an AS number.</p>
+<div class="vs"><div><h4>IGP: inside an AS</h4>RIP, OSPF, IS-IS, EIGRP <span class="add">+ Added</span>. Goal: fastest/shortest path.</div><div><h4>EGP: between ASes</h4>BGP. Goal: policy (business relationships, who pays whom).</div></div>
+<p><strong>BGP (Border Gateway Protocol)</strong> is the routing protocol of the Internet between ASes. It isn't simply "find the shortest path"; it considers <strong>policies and multiple path attributes</strong>.</p>
+<ul><li><span class="add">+ Added</span> <strong>Path-vector</strong> protocol: advertisements carry the full AS_PATH; a router rejects any path containing its own AS number → loop prevention.</li><li>Runs over <strong>TCP port 179</strong> (reliable, incremental updates).</li><li><strong>eBGP</strong> between different ASes; <strong>iBGP</strong> distributes external routes inside one AS.</li><li>Attributes: AS_PATH, NEXT_HOP, LOCAL_PREF, MED. BGP hijacks/leaks have caused real outages.</li></ul>
+</section>
+
+<section><h2 id="rt-compare"><span class="num">7.8</span>Distance Vector vs Link State</h2>
+<div class="tbl"><table><thead><tr><th>Feature</th><th>Distance Vector</th><th>Link State</th></tr></thead><tbody>
+<tr><td>Knowledge</td><td>Neighbour information</td><td>Full topology</td></tr><tr><td>Main idea</td><td>Distance + direction</td><td>Map, then compute</td></tr><tr><td>Algorithm</td><td>Bellman-Ford</td><td>Dijkstra</td></tr><tr><td>Example</td><td>RIP</td><td>OSPF</td></tr><tr><td>Updates</td><td>Whole table to neighbours, periodic</td><td>LSAs flooded to all, on change</td></tr><tr><td>Convergence</td><td>Slower</td><td>Faster</td></tr><tr><td>Count-to-infinity</td><td>Yes</td><td>Not the same problem</td></tr><tr><td>CPU / memory</td><td>Low</td><td>Higher</td></tr></tbody></table></div>
+<ul class="tree"><li><span class="t">Routing Protocols</span><ul><li><span class="t">IGP</span><ul><li>RIP <em>→ Distance Vector</em></li><li>OSPF <em>→ Link State</em></li></ul></li><li><span class="t">EGP</span><ul><li>BGP <em>→ Path vector, inter-AS</em></li></ul></li></ul></li></ul>
+<div class="co trap"><span class="lb">Subtle but important</span><p>Don't say "Dijkstra is the OSPF protocol". Say: <strong>OSPF is a routing protocol that uses the Shortest Path First approach based on Dijkstra's algorithm.</strong> Similarly, RIP is a Distance Vector protocol based on the Bellman-Ford principle.</p></div>
+<div class="co qa"><span class="lb">Interview answer</span><p><strong>Why does OSPF generally converge faster than RIP?</strong> Because in OSPF every router has the full topology and recomputes paths itself as soon as an LSA arrives, while distance-vector protocols exchange distances iteratively with neighbours on timers and can suffer from count-to-infinity.</p></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Chains to memorise</h4><ul><li>RIP → DV → Bellman-Ford → count-to-infinity</li><li>OSPF → Link State → Dijkstra → shortest path</li><li>BGP → between ASes → policy, path vector</li></ul></div>
+<div><h4>RIP</h4><ul><li>Hop count, max 15, 16 = ∞</li><li>Every 30 s, UDP 520</li></ul></div>
+<div><h4>OSPF</h4><ul><li>Cost (bandwidth), areas, Area 0</li><li>IP protocol 89, Hello packets</li></ul></div>
+<div><h4>BGP</h4><ul><li>TCP 179, AS_PATH loop prevention</li><li>eBGP / iBGP</li></ul></div>
+<div><h4>Fixes for count-to-∞</h4><ul><li>Split horizon</li><li>Poison reverse</li><li>Hold-down, triggered updates</li></ul></div>
+</div>
+</div>
+</article>

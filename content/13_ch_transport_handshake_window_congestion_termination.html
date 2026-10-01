@@ -1,0 +1,360 @@
+
+<!-- ================= CH: TRANSPORT ================= -->
+<article class="ch" data-ch="transport" hidden>
+<div class="pane notes">
+<p>From host-to-host (IP) to <strong>process-to-process</strong>. One of the highest-priority CN topics for placements.</p>
+<section><h2 id="tp-job"><span class="num">8.1</span>What does the Transport layer do?</h2>
+<p>The Network layer gets data from one <strong>host</strong> to another. The Transport layer gets it to the right <strong>process/application</strong>. IP gets the packet to Google's server; the <strong>port number</strong> gets it to the web server process.</p>
+<div class="flow h"><span>Your browser</span><span>Your laptop</span><span>Internet</span><span>Google server</span><span>Web server process</span></div>
+</section>
+
+<section><h2 id="tp-ports"><span class="num">8.2</span>Ports and sockets</h2>
+<p>A <strong>port</strong> (16-bit, 0–65535) identifies a process/service on a host. <code>142.x.x.x:443</code> = that host's HTTPS service.</p>
+<div class="tbl"><table><thead><tr><th>Protocol</th><th class="n">Port</th><th>Transport</th></tr></thead><tbody>
+<tr><td>HTTP</td><td class="n">80</td><td>TCP</td></tr><tr><td>HTTPS</td><td class="n">443</td><td>TCP (UDP for HTTP/3)</td></tr><tr><td>FTP</td><td class="n">20 / 21</td><td>TCP</td></tr><tr><td>SSH</td><td class="n">22</td><td>TCP</td></tr><tr><td>DNS</td><td class="n">53</td><td>UDP (TCP too)</td></tr><tr><td>SMTP</td><td class="n">25</td><td>TCP</td></tr><tr><td>DHCP</td><td class="n">67 / 68</td><td>UDP</td></tr></tbody></table></div>
+<p>Especially remember: <strong>HTTP 80 · HTTPS 443 · DNS 53 · SSH 22</strong>. The full list is on the Cheat Sheet.</p>
+<p><span class="add">+ Added</span> Port ranges: <strong>0–1023</strong> well-known (need admin to bind), <strong>1024–49151</strong> registered, <strong>49152–65535</strong> dynamic/ephemeral (your client's random source port).</p>
+<p>A <strong>socket</strong> = IP + port, e.g. <code>192.168.1.10:5000</code>. A TCP connection is uniquely identified by the <strong>4-tuple</strong> (5-tuple with protocol): source IP, source port, destination IP, destination port. That's how one server on port 443 handles thousands of clients at once: every connection differs in the client's IP or port.</p>
+<pre class="dg">One connection = 4-tuple
+192.168.1.10:5000  ──→  142.250.x.x:443
+<em>(src IP : src port)      (dst IP : dst port)</em></pre>
+</section>
+
+<section><h2 id="tp-vs"><span class="num">8.3</span>TCP vs UDP</h2>
+<div class="vs">
+<div><h4>TCP · Transmission Control Protocol</h4><ul><li>Connection-oriented</li><li>Reliable, ordered</li><li>Full-duplex, byte-stream</li><li>Flow + congestion control</li><li>ACKs and retransmission</li></ul><p style="margin:.5rem 0 0;color:var(--muted);font-size:.9rem">"I care that the data arrives correctly and in order."</p></div>
+<div><h4>UDP · User Datagram Protocol</h4><ul><li>Connectionless</li><li>Best-effort (unreliable)</li><li>No ordering, no retransmission</li><li>No flow/congestion control</li><li>Datagram (message boundaries kept)</li></ul><p style="margin:.5rem 0 0;color:var(--muted);font-size:.9rem">"Send it quickly; let the application handle reliability."</p></div>
+</div>
+<div class="tbl"><table><thead><tr><th>TCP</th><th>UDP</th></tr></thead><tbody>
+<tr><td>Connection-oriented (handshake)</td><td>Connectionless</td></tr><tr><td>Reliable</td><td>Best-effort</td></tr><tr><td>Ordered</td><td>No ordering guarantee</td></tr><tr><td>ACKs</td><td>No ACKs</td></tr><tr><td>Retransmission</td><td>None built in</td></tr><tr><td>Flow control (rwnd)</td><td>No</td></tr><tr><td>Congestion control (cwnd)</td><td>No</td></tr><tr><td>Byte stream</td><td>Datagram</td></tr><tr><td>Header 20–60 B</td><td>Header 8 B</td></tr><tr><td>Unicast only</td><td>Unicast, broadcast, multicast <span class="add">+ Added</span></td></tr></tbody></table></div>
+<div class="co trap"><span class="lb">Don't say "UDP is always faster"</span><p>Better: UDP has lower protocol overhead and skips TCP's connection setup, reliability and congestion control, so it is useful when <strong>low latency</strong> or <strong>application-controlled reliability</strong> is preferred.</p></div>
+<h3>Where UDP is used</h3>
+<ul><li><strong>DNS</strong>: small request/response, low overhead (TCP when needed).</li><li><strong>DHCP</strong>: the client doesn't have an IP address yet.</li><li><strong>Real-time</strong>: gaming, voice, video calls, live streaming. If audio packet 100 is lost, waiting seconds to retransmit old audio is worse than continuing.</li><li><span class="add">+ Added</span> SNMP, NTP, TFTP, VPNs (WireGuard), and <strong>QUIC/HTTP/3</strong> which builds reliability on top of UDP.</li></ul>
+</section>
+
+<section><h2 id="tp-headers"><span class="num">8.4</span>TCP segment and UDP datagram headers</h2>
+<div class="wg" data-wg="tcphdr"></div>
+<p>Most important TCP fields: <strong>Sequence Number, Acknowledgement Number, Flags, Window Size</strong>.</p>
+<div class="co added"><span class="lb">+ Added · header details</span><ul>
+<li>Seq and ACK numbers are <strong>32-bit</strong>; they wrap around (2³² bytes ≈ 4 GB).</li>
+<li><strong>Data offset</strong> = header length in 4-byte words (5–15 → 20–60 bytes).</li>
+<li><strong>Window</strong> is 16-bit (max 65,535 bytes); the <strong>window scale</strong> option multiplies it (up to 2¹⁴×) for fast links.</li>
+<li>Common options: <strong>MSS</strong>, window scale, <strong>SACK-permitted</strong>, timestamps.</li>
+<li><strong>MSS</strong> (Maximum Segment Size) = MTU − IP header − TCP header = 1500 − 20 − 20 = <strong>1460 bytes</strong> on Ethernet.</li>
+<li>Flags: URG, ACK, PSH, RST, SYN, FIN (+ ECE, CWR for ECN).</li>
+<li>UDP checksum is optional in IPv4 but mandatory in IPv6.</li></ul></div>
+<p>UDP header size: <strong>8 bytes</strong> (source port, destination port, length, checksum). TCP minimum header: <strong>20 bytes</strong>.</p>
+</section>
+
+<section><h2 id="tp-mux"><span class="num">8.5</span>Multiplexing and demultiplexing</h2>
+<div class="wg" data-wg="mux"></div>
+<p><strong>Multiplexing</strong> (sender): Chrome, Spotify and Discord all send at once; the Transport layer combines their data and tags each with port numbers. <strong>Demultiplexing</strong> (receiver): Transport reads the destination port (e.g. 443) and hands the data to the correct process. <span class="add">+ Added</span> UDP demultiplexes by (dst IP, dst port) only; TCP uses the full 4-tuple, which is why each TCP connection gets its own socket.</p>
+</section>
+
+<section><h2 id="tp-conn"><span class="num">8.6</span>Connection-oriented vs connectionless, and TCP reliability</h2>
+<div class="vs"><div><h4>TCP</h4><div class="flow"><span>Connection establishment</span><span>Data transfer</span><span>Connection termination</span></div></div><div><h4>UDP</h4><div class="flow"><span>Send datagram</span></div><p style="font-size:.9rem;color:var(--muted)">No transport-level connection setup, so "connectionless".</p></div></div>
+<ul class="tree"><li><span class="t">TCP Reliability</span><ul><li>Sequence numbers</li><li>ACKs (cumulative)</li><li>Retransmission (timeout, 3 dup ACKs)</li><li>Checksum</li><li>Sliding window</li></ul></li></ul>
+<p>TCP numbers <strong>bytes</strong>. The ACK number is the <strong>next byte expected</strong>: <code>ACK = 300</code> means "I have everything up to byte 299; send 300 next."</p>
+</section>
+
+<section><h2 id="tp-flowcong"><span class="num">8.7</span>Flow control vs congestion control</h2>
+<p>Don't mix these. Interviewers love this distinction.</p>
+<div class="vs"><div><h4>Flow control → protect the RECEIVER</h4>Sender is faster than the receiver can process. Controlled by the <strong>receive window (rwnd)</strong> the receiver advertises.</div><div><h4>Congestion control → protect the NETWORK</h4>Too much traffic is entering the network. Controlled by the sender's <strong>congestion window (cwnd)</strong>: slow start, congestion avoidance, fast retransmit, fast recovery.</div></div>
+<h3>TCP connection: the big picture</h3>
+<div class="flow"><span>3-way handshake</span><span>Connection established</span><span>Data transfer: ACKs · retransmission · flow control · congestion control</span><span>4-way termination</span><span>Connection closed</span></div>
+</section>
+
+<section><h2 id="tp-sockets"><span class="num">8.8</span>Socket programming flow <span class="add">+ Added</span></h2>
+<p>SDE interviews often ask "how does a server accept connections?" The Berkeley sockets API maps directly onto the TCP concepts above.</p>
+<div class="vs">
+<div><h4>TCP server</h4><div class="flow"><span>socket()</span><span>bind(IP, port)</span><span>listen(backlog)</span><span>accept() → new socket per client (handshake already done by the kernel)</span><span>recv() / send()</span><span>close() → FIN</span></div></div>
+<div><h4>TCP client</h4><div class="flow"><span>socket()</span><span>connect(server IP, port) → 3-way handshake</span><span>send() / recv()</span><span>close() → FIN</span></div></div>
+</div>
+<ul><li>The <strong>listening socket</strong> never carries data; every <code>accept()</code> returns a new connected socket identified by the full 4-tuple.</li><li>The <code>listen()</code> backlog is the queue of completed (and half-open) connections, which is exactly what a SYN flood fills.</li><li><strong>UDP</strong> has no <code>listen()</code>/<code>accept()</code>/<code>connect()</code> handshake: just <code>socket()</code>, <code>bind()</code>, <code>sendto()</code> / <code>recvfrom()</code>.</li><li>The client normally doesn't call <code>bind()</code>: the OS picks an ephemeral source port.</li><li>Blocking vs non-blocking sockets; servers handle many clients with threads or event loops (<code>select</code>/<code>epoll</code>, which is what Node.js and Nginx use).</li></ul>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Identity</h4><ul><li>IP → host · Port → process</li><li>Socket = IP + port</li><li>TCP connection = 4-tuple</li><li>Ephemeral ports 49152–65535</li></ul></div>
+<div><h4>TCP</h4><ul><li>Reliable, ordered, connection-oriented</li><li>Byte stream, full-duplex</li><li>Header 20–60 B; MSS 1460</li></ul></div>
+<div><h4>UDP</h4><ul><li>Connectionless, best-effort, datagram</li><li>Header 8 B</li><li>DNS, DHCP, VoIP, gaming, QUIC</li></ul></div>
+<div><h4>Control</h4><ul><li>Flow → rwnd → receiver</li><li>Congestion → cwnd → network</li><li>Mux at sender, demux at receiver by port</li></ul></div>
+<div><h4>Sockets API <span class="add">+ Added</span></h4><ul><li>Server: socket → bind → listen → accept → recv/send → close</li><li>Client: socket → connect → send/recv → close</li><li>UDP: no listen/accept, just sendto/recvfrom</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: HANDSHAKE ================= -->
+<article class="ch" data-ch="handshake" hidden>
+<div class="pane notes">
+<p>One of the most frequently asked CN topics. Don't just memorise SYN → SYN-ACK → ACK; understand <strong>why</strong> each step exists.</p>
+<section><h2 id="hs-why"><span class="num">9.1</span>Why does TCP need a handshake?</h2>
+<p>TCP is connection-oriented. Before sending data, both sides must agree on state, especially:</p>
+<ul><li>Each side's <strong>Initial Sequence Number</strong> (ISN)</li><li>Connection state (and options like MSS, window scale, SACK)</li><li>Proof that <strong>both</strong> directions work</li></ul>
+<p>Step through it. Change the ISNs to see how the numbers follow.</p>
+<div class="wg" data-wg="seq-handshake"></div>
+</section>
+
+<section><h2 id="hs-steps"><span class="num">9.2</span>The three steps</h2>
+<div class="tbl"><table><thead><tr><th>Step</th><th>Direction</th><th>Fields</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>1. SYN</td><td>Client → Server</td><td class="n">SYN=1, Seq=x</td><td>"I want to connect; my sequence numbers start at x."</td></tr>
+<tr><td>2. SYN + ACK</td><td>Server → Client</td><td class="n">SYN=1, ACK=1, Seq=y, Ack=x+1</td><td>"Got your SYN. My numbers start at y. I expect x+1 next."</td></tr>
+<tr><td>3. ACK</td><td>Client → Server</td><td class="n">ACK=1, Seq=x+1, Ack=y+1</td><td>"Got your y. Ready." Connection ESTABLISHED.</td></tr>
+</tbody></table></div>
+<pre class="dg">Client                              Server
+CLOSED                              LISTEN
+   | -------- <b>SYN, Seq=x</b> ------------->|
+SYN-SENT                         SYN-RECEIVED
+   | <---- <b>SYN+ACK, Seq=y, Ack=x+1</b> ----|
+   | -------- <b>ACK, Ack=y+1</b> ----------->|
+ESTABLISHED                       ESTABLISHED</pre>
+<p><span class="add">+ Added</span> The third ACK may already carry data. The ISN is chosen <strong>randomly</strong> (not 0) so old segments from a previous connection and blind spoofing attacks are unlikely to match.</p>
+</section>
+
+<section><h2 id="hs-why3"><span class="num">9.3</span>Why 3-way and not 2-way?</h2>
+<p>Both sides need to know the other can <strong>send and receive</strong>, and sequence numbers must be synchronised in <strong>both directions</strong>.</p>
+<ul><li>After SYN → SYN-ACK, the <strong>client</strong> knows the server got its SYN and can reply.</li><li>But the <strong>server</strong> doesn't yet know the client received the SYN-ACK (and so the server's ISN y).</li><li>The third ACK confirms that.</li></ul>
+<p><span class="add">+ Added</span> It also protects against <strong>old duplicate SYNs</strong>: if a delayed SYN from a dead connection arrives, the server's SYN-ACK gets a RST from the client instead of opening a ghost connection, which a 2-way handshake could not prevent.</p>
+</section>
+
+<section><h2 id="hs-seq"><span class="num">9.4</span>Sequence numbers and ACK numbers</h2>
+<p>TCP is a <strong>byte-stream</strong> protocol: sequence numbers count <strong>bytes</strong>, not segments.</p>
+<p>ISN = 1000, send 500 bytes → they occupy 1000 to 1499 → receiver replies <strong>ACK = 1500</strong> ("I've got everything before 1500, send 1500 next"). The next segment carries Seq = 1500.</p>
+<div class="co key"><span class="lb">Rules</span><span class="fx">ACK number = next byte expected</span><span class="fx">Next Seq = Seq + data length</span><span class="fx">SYN consumes 1 sequence number</span><span class="fx">FIN consumes 1 sequence number</span><span class="fx">A pure ACK (no data) consumes 0</span></div>
+<p>Classic trap: client SYN with Seq = 100 → server replies <strong>Ack = 101</strong> (the SYN consumed one number).</p>
+<div class="wg" data-wg="seqcalc"></div>
+<h3>What if a segment is lost?</h3>
+<p>Sender sends 1000–1099, 1100–1199 (lost), 1200–1299. Receiver got the first and third, but still expects 1100, so it keeps sending <strong>ACK = 1100</strong>. These are <strong>duplicate ACKs</strong>. Three of them trigger <strong>Fast Retransmit</strong> (Congestion Control chapter).</p>
+</section>
+
+<section><h2 id="hs-flags"><span class="num">9.5</span>TCP flags</h2>
+<div class="tbl"><table><thead><tr><th>Flag</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>SYN</td><td>Synchronise: connection establishment</td></tr><tr><td>ACK</td><td>Acknowledgement field is valid (set on almost every segment after the first SYN)</td></tr><tr><td>FIN</td><td>Graceful termination: "I'm done sending"</td></tr><tr><td>RST</td><td>Reset: abrupt termination</td></tr><tr><td>PSH</td><td>Push data to the application immediately</td></tr><tr><td>URG</td><td>Urgent data (urgent pointer valid); rarely used</td></tr></tbody></table></div>
+<p>Most important: <strong>SYN, ACK, FIN, RST</strong>.</p>
+</section>
+
+<section><h2 id="hs-flood"><span class="num">9.6</span>SYN flood attack</h2>
+<p>The attacker sends lots of SYNs (often from spoofed IPs). The server replies SYN-ACK and keeps state for each <strong>half-open connection</strong> in its backlog queue, but the final ACK never comes. The queue fills and real clients can't connect: a denial of service.</p>
+<p><span class="add">+ Added</span> Defences: <strong>SYN cookies</strong> (encode the connection state into the server's ISN so no memory is kept until the ACK returns), larger backlog, shorter SYN-RECEIVED timeouts, rate limiting, upstream DDoS scrubbing.</p>
+</section>
+
+<section><h2 id="hs-states"><span class="num">9.7</span>Connection states and a key distinction</h2>
+<div class="vs"><div><h4>Client</h4><div class="flow"><span>CLOSED</span><span>SYN-SENT</span><span>ESTABLISHED</span></div></div><div><h4>Server</h4><div class="flow"><span>LISTEN</span><span>SYN-RECEIVED</span><span>ESTABLISHED</span></div></div></div>
+<div class="co trap"><span class="lb">Don't mix them</span><p><strong>Handshake = 3-way</strong>: SYN, SYN-ACK, ACK.<br><strong>Termination = usually 4-way</strong>: FIN, ACK, FIN, ACK.</p></div>
+<p><span class="add">+ Added</span> <strong>TCP Fast Open</strong> lets a returning client send data in the SYN using a cookie, saving one RTT. TLS 1.3 and QUIC push this further.</p>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Handshake</h4><ul><li>SYN (Seq=x)</li><li>SYN+ACK (Seq=y, Ack=x+1)</li><li>ACK (Ack=y+1)</li><li>Purpose: sync ISNs both ways + prove both directions</li></ul></div>
+<div><h4>Numbers</h4><ul><li>ACK = next byte expected</li><li>SYN and FIN consume 1</li><li>ISN random</li></ul></div>
+<div><h4>Flags</h4><ul><li>SYN establish · ACK acknowledge</li><li>FIN graceful close · RST reset</li><li>PSH push · URG urgent</li></ul></div>
+<div><h4>Attacks &amp; loss</h4><ul><li>SYN flood → half-open → SYN cookies</li><li>Dup ACKs → possible loss → fast retransmit</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: SLIDING WINDOW ================= -->
+<article class="ch" data-ch="window" hidden>
+<div class="pane notes">
+<p>Connects sequence numbers, ACKs, retransmission, receiver window and sliding window. The foundation for congestion control.</p>
+<section><h2 id="sw-why"><span class="num">10.1</span>Why a sliding window?</h2>
+<p>Stop-and-Wait: send one segment, wait for its ACK, send the next. Reliable but slow, especially when delay is large: the link sits idle for a whole RTT after every packet. A sliding window lets <strong>multiple bytes/segments be in flight</strong> before waiting for ACKs, which improves utilisation.</p>
+<div class="co formula"><span class="lb">How much better? <span class="add">+ Added</span></span><span class="fx">Stop-and-Wait efficiency η = 1 / (1 + 2a), &nbsp;a = Tp / Tt</span><span class="fx">Window of N: η = min(1, N / (1 + 2a))</span><span class="fx">Window needed for 100% utilisation: N ≥ 1 + 2a</span><p style="margin:.3rem 0 0;font-size:.9rem">Example: Tt = 1 ms, Tp = 10 ms → a = 10 → Stop-and-Wait η = 1/21 ≈ 4.8%. A window of 21 fills the pipe.</p></div>
+<p>TCP's window is measured in <strong>bytes</strong>, not packets. Below, the window covers what may be sent without waiting; it slides right as ACKs come in.</p>
+<div class="wg" data-wg="slidewin"></div>
+<p>Why "sliding"? Suppose the window initially covers four positions. As the receiver acknowledges the first part, the window moves forward:</p>
+<pre class="dg">[1000 1010 1020 1030]
+      [1010 1020 1030 1040]     <em>← first part ACKed</em>
+            [1020 1030 1040 1050]</pre>
+<p>The window slides forward as data is acknowledged. Byte view: if the current window allows <code>1000 → 1399</code>, the sender may send all of those bytes without waiting for further ACKs.</p>
+</section>
+
+<section><h2 id="sw-flow"><span class="num">10.2</span>Flow control and rwnd</h2>
+<p>The sender can transmit much faster than the receiver's application reads. If it sends too much, the receive buffer overflows and data is lost. <strong>Flow control prevents the sender from overwhelming the receiver.</strong></p>
+<p>The receiver advertises a <strong>Receive Window (rwnd)</strong> in every segment: "you may have up to rwnd more bytes outstanding". If rwnd = 5000, the sender must keep unacknowledged data ≤ 5000.</p>
+<div class="co key"><span class="lb">The one formula</span><span class="fx">Effective send window = min(rwnd, cwnd)</span><p style="margin:.3rem 0 0">rwnd protects the receiver; cwnd protects the network. Example: rwnd = 10 KB, cwnd = 6 KB → 6 KB (network limits). Later rwnd = 4 KB, cwnd = 6 KB → 4 KB (receiver limits).</p></div>
+<div class="wg" data-wg="effwin"></div>
+<div class="co added"><span class="lb">+ Added · edge cases interviewers like</span><ul>
+<li><strong>Zero window</strong>: receiver advertises rwnd = 0, sender stops and runs a <strong>persist timer</strong>, sending small window probes so a lost "window open" update can't deadlock the connection.</li>
+<li><strong>Silly Window Syndrome</strong>: tiny windows cause tiny segments (40 B header for 1 B data). Fixes: receiver waits until it can advertise a decent window (Clark); sender uses <strong>Nagle's algorithm</strong> (buffer small writes while an ACK is outstanding).</li>
+<li><strong>Delayed ACK</strong>: receiver waits up to ~200 ms (or every 2nd segment) to ACK. Nagle + delayed ACK together can add latency; interactive apps set <code>TCP_NODELAY</code>.</li></ul></div>
+</section>
+
+<section><h2 id="sw-ack"><span class="num">10.3</span>Cumulative ACKs, loss and retransmission</h2>
+<p>TCP commonly uses <strong>cumulative ACKs</strong>: receiving 1000–1099, 1100–1199, 1200–1299 → one <code>ACK = 1300</code> confirms everything before 1300.</p>
+<p>If 1100–1199 is lost, the receiver keeps sending <code>ACK = 1100</code> for every later segment: <strong>duplicate ACKs</strong>.</p>
+<div class="vs"><div><h4>Loss signal 1: Timeout</h4>No ACK before the retransmission timer (RTO) expires → retransmit. Strong congestion signal.</div><div><h4>Loss signal 2: Duplicate ACKs</h4>3 duplicate ACKs → <strong>fast retransmit</strong> without waiting for the timer.</div></div>
+<h3>How long is the timeout? <span class="add">+ Added</span></h3>
+<div class="co formula"><span class="lb">RTO estimation (Jacobson / RFC 6298)</span>
+<span class="fx">EstimatedRTT = (1 − α)·EstimatedRTT + α·SampleRTT &nbsp;<em>α = 1/8</em></span>
+<span class="fx">DevRTT = (1 − β)·DevRTT + β·|SampleRTT − EstimatedRTT| &nbsp;<em>β = 1/4</em></span>
+<span class="fx">RTO = EstimatedRTT + 4·DevRTT</span>
+<p style="margin:.3rem 0 0;font-size:.9rem"><strong>Karn's algorithm</strong>: don't take RTT samples from retransmitted segments (you can't tell which copy was ACKed), and double the RTO after each timeout (exponential backoff).</p></div>
+</section>
+
+<section><h2 id="sw-gbn"><span class="num">10.4</span>Go-Back-N vs Selective Repeat</h2>
+<p>General sliding-window ARQ schemes. Lose one packet and compare what gets resent:</p>
+<div class="wg" data-wg="gbnsr"></div>
+<div class="tbl"><table><thead><tr><th></th><th>Go-Back-N</th><th>Selective Repeat</th></tr></thead><tbody>
+<tr><td>On loss of k</td><td>Resend k and everything after it</td><td>Resend only k</td></tr>
+<tr><td>Receiver buffer</td><td>None (window 1), discards out-of-order</td><td>Buffers out-of-order packets</td></tr>
+<tr><td>ACKs</td><td>Cumulative</td><td>Individual</td></tr>
+<tr><td>Sender window (k-bit seq) <span class="add">+ Added</span></td><td class="n">≤ 2^k − 1</td><td class="n">≤ 2^(k−1)</td></tr>
+<tr><td>Complexity</td><td>Simple receiver</td><td>More complex, less bandwidth wasted</td></tr>
+</tbody></table></div>
+<div class="co trap"><span class="lb">TCP nuance</span><p>Don't blindly say "TCP = Selective Repeat". Classic TCP uses cumulative ACKs and its retransmission behaviour resembles Go-Back-N in some respects, but receivers buffer out-of-order data, and modern TCP uses <strong>SACK</strong> (Selective Acknowledgment) so the receiver can say "I'm missing 3, but I have 4 and 5", and only the gap is resent. TCP is best described as a hybrid.</p></div>
+<p><span class="add">+ Added</span> Why the window limit? With 2-bit sequence numbers (0–3) and SR window 3: if all ACKs are lost, the receiver can't tell a retransmitted old packet 0 from a new packet 0. Window ≤ 2 avoids the overlap.</p>
+</section>
+
+<section><h2 id="sw-terms"><span class="num">10.5</span>Terms and the big picture</h2>
+<ul><li><strong>Bytes in flight</strong>: sent but not yet acknowledged. Sent 10 KB, ACKed 6 KB → in flight 4 KB.</li><li><strong>Window</strong>: max outstanding data allowed under current limits.</li></ul>
+<ul class="tree"><li><span class="t">TCP Reliability</span><ul><li>Sequence numbers</li><li>ACKs</li><li>Checksum</li><li>Sliding window</li><li>Retransmission timer</li><li>Duplicate ACKs</li><li>SACK</li></ul></li></ul>
+<p>Don't say "TCP is reliable because of ACK". It's the combination of all of these.</p>
+<pre class="dg">                 TCP Sender
+             ┌───────┴───────┐
+        <b>Flow Control</b>   <b>Congestion Control</b>
+            rwnd             cwnd
+             └───────┬───────┘
+          Effective Window = min(rwnd, cwnd)
+                     ↓
+                  Network</pre>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Window</h4><ul><li>Many bytes in flight → utilisation</li><li>Effective = min(rwnd, cwnd)</li><li>Stop-and-wait η = 1/(1+2a)</li><li>Full pipe: N ≥ 1+2a</li></ul></div>
+<div><h4>ACKs &amp; loss</h4><ul><li>Cumulative ACK = next byte expected</li><li>Loss → timeout OR 3 dup ACKs</li><li>RTO = EstRTT + 4·DevRTT; Karn's rule</li></ul></div>
+<div><h4>GBN vs SR</h4><ul><li>GBN resends k..end, window ≤ 2^k−1</li><li>SR resends k only, window ≤ 2^(k−1)</li><li>TCP: cumulative + SACK hybrid</li></ul></div>
+<div><h4>Edge cases</h4><ul><li>rwnd = 0 → persist timer probes</li><li>Silly window → Nagle / Clark</li><li>Delayed ACK ~200 ms</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: CONGESTION ================= -->
+<article class="ch" data-ch="congestion" hidden>
+<div class="pane notes">
+<p>The main question: <strong>how much data should a TCP sender put into the network without causing congestion?</strong> One of the most algorithm-heavy placement topics.</p>
+<section><h2 id="cc-vars"><span class="num">11.1</span>cwnd and ssthresh</h2>
+<div class="vs"><div><h4>Flow control</h4>Protects the RECEIVER → rwnd</div><div><h4>Congestion control</h4>Protects the NETWORK → cwnd</div></div>
+<p><strong>cwnd</strong> (congestion window) is kept by the <strong>sender</strong> only (never sent in a header). It limits how much unacknowledged data can be in the network: cwnd = 10 KB → ~10 KB in flight, subject to rwnd.</p>
+<p><strong>ssthresh</strong> (slow start threshold) decides when TCP switches from Slow Start to Congestion Avoidance.</p>
+<p>TCP has no explicit signal from routers (unless ECN), so it <strong>infers</strong> congestion from loss: a timeout or duplicate ACKs.</p>
+</section>
+
+<section><h2 id="cc-sim"><span class="num">11.2</span>See it: the cwnd graph</h2>
+<p>Pick ssthresh and when the losses happen. The chart draws Tahoe and Reno together so the difference is obvious. Hover or tap a point for the round's value.</p>
+<div class="wg" data-wg="cwnd"></div>
+</section>
+
+<section><h2 id="cc-ss"><span class="num">11.3</span>Slow Start</h2>
+<p>Despite the name, Slow Start grows <strong>very quickly</strong>. It starts small because the sender doesn't know the network's capacity, then increases while watching for trouble.</p>
+<p>cwnd grows by 1 MSS for every ACK received, which <strong>doubles cwnd every RTT</strong>: 1 → 2 → 4 → 8 → 16 → 32 MSS. Exponential growth.</p>
+<p>When <strong>cwnd ≥ ssthresh</strong>, TCP enters Congestion Avoidance. <span class="add">+ Added</span> Modern stacks start with an initial window of 10 MSS (RFC 6928), not 1.</p>
+</section>
+
+<section><h2 id="cc-ca"><span class="num">11.4</span>Congestion Avoidance and AIMD</h2>
+<p>Growth becomes roughly <strong>linear</strong>: about +1 MSS per RTT (16 → 17 → 18 → 19 → 20). This follows <strong>AIMD</strong>:</p>
+<ul><li><strong>Additive Increase</strong>: no trouble → cwnd += ~1 MSS per RTT.</li><li><strong>Multiplicative Decrease</strong>: congestion detected → cwnd ≈ cwnd / 2 (e.g. 20 → 10).</li></ul>
+<p>Repeated, this gives the famous <strong>sawtooth</strong>. <span class="add">+ Added</span> AIMD is used because it converges to <strong>fairness</strong>: competing flows end up sharing the bottleneck roughly equally.</p>
+</section>
+
+<section><h2 id="cc-fr"><span class="num">11.5</span>Fast Retransmit and Fast Recovery</h2>
+<p>Packet 3 is lost while 4 and 5 arrive; the receiver keeps ACKing the gap, so the sender sees duplicate ACKs. After <strong>3 duplicate ACKs</strong>, TCP performs <strong>Fast Retransmit</strong>: resend the missing segment immediately, without waiting for the timeout.</p>
+<p>3 dup ACKs mean data is <em>still flowing</em> (later packets are arriving), so the network isn't badly congested. <strong>Fast Recovery</strong> (Reno) uses that: halve cwnd instead of collapsing to 1.</p>
+</section>
+
+<section><h2 id="cc-variants"><span class="num">11.6</span>Tahoe vs Reno</h2>
+<div class="tbl"><table><thead><tr><th>Event</th><th>Tahoe</th><th>Reno</th></tr></thead><tbody>
+<tr><td>3 duplicate ACKs</td><td>ssthresh = cwnd/2, <strong>cwnd = 1 MSS</strong>, Slow Start</td><td>ssthresh = cwnd/2, <strong>cwnd ≈ ssthresh</strong> (+3), Fast Recovery</td></tr>
+<tr><td>Timeout</td><td>ssthresh = cwnd/2, cwnd = 1 MSS</td><td>ssthresh = cwnd/2, cwnd = 1 MSS</td></tr>
+<tr><td>Fast Retransmit</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Fast Recovery</td><td>No</td><td>Yes</td></tr>
+<tr><td>Slow Start after 3 dup ACK</td><td>Yes</td><td>No</td></tr>
+</tbody></table></div>
+<div class="co key"><span class="lb">One-line memory trick</span><span class="fx">TAHOE: 3 dup ACK → back to 1 MSS</span><span class="fx">RENO: 3 dup ACK → cut in half + Fast Recovery</span><span class="fx">BOTH: Timeout → cwnd = 1 MSS → Slow Start</span></div>
+<h3>Worked examples</h3>
+<p><strong>3 dup ACKs, Reno</strong>: cwnd = 16, ssthresh = 8, in CA. → ssthresh = 8, cwnd ≈ 8, Fast Recovery, then 8 → 9 → 10 → 11 (linear).</p>
+<p><strong>Timeout</strong>: cwnd = 16 → ssthresh = 8, cwnd = 1 → 1 → 2 → 4 → 8 (Slow Start) → 9 → 10 → 11 (CA).</p>
+<div class="co added"><span class="lb">+ Added · beyond Reno</span><ul><li><strong>NewReno</strong>: stays in fast recovery until all data lost in the window is recovered (handles multiple losses).</li><li><strong>CUBIC</strong>: default in Linux/Windows/macOS. Window grows as a cubic function of time since last loss; good on high-bandwidth, long-delay paths.</li><li><strong>BBR</strong> (Google): models bottleneck bandwidth and RTT instead of reacting to loss.</li><li><strong>ECN</strong>: routers mark packets (instead of dropping) when queues build; receiver echoes ECE, sender reduces cwnd and sets CWR.</li></ul></div>
+</section>
+
+<section><h2 id="cc-flow"><span class="num">11.7</span>The whole algorithm as one flow</h2>
+<div class="wg" data-wg="flow-cc"></div>
+<div class="co qa"><span class="lb">Classic interview question</span><p><strong>Why does TCP reduce its sending rate when packet loss occurs?</strong> Because loss usually means router queues are overflowing (congestion). Reducing cwnd lowers the traffic injected into the network so queues can drain; otherwise everyone keeps retransmitting and the network collapses (congestion collapse).</p></div>
+</section>
+
+<section><h2 id="cc-shaping"><span class="num">11.8</span>Traffic shaping: leaky bucket vs token bucket <span class="add">+ Added</span></h2>
+<p>A classic GATE/placement question. Congestion control is the <em>sender reacting</em> to the network; traffic shaping is a router or host <em>enforcing</em> a rate.</p>
+<div class="vs">
+<div><h4>Leaky bucket</h4><ul><li>Packets enter a bucket (queue) at any rate</li><li>They leave at a <strong>constant rate</strong>, like water dripping from a hole</li><li>Bucket full → packets are dropped</li><li>Smooths bursts completely; output is rigid</li></ul></div>
+<div><h4>Token bucket</h4><ul><li>Tokens are added at rate r up to capacity C</li><li>Sending a packet (or byte) consumes a token</li><li><strong>Allows bursts</strong> up to C when tokens have built up, while the long-run rate stays r</li><li>Used for API rate limiting and QoS policing</li></ul></div>
+</div>
+<div class="co formula"><span class="lb">Token bucket burst length</span><span class="fx">Max burst time S = C / (M − r)</span><p style="margin:.3rem 0 0;font-size:.9rem">C = bucket capacity (bytes), r = token rate, M = maximum output (link) rate. Example: C = 250 KB, r = 2 MB/s, M = 25 MB/s → S = 250 / 23,000 s ≈ 10.9 ms at full speed.</p></div>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Variables</h4><ul><li>cwnd → network, rwnd → receiver</li><li>Effective = min(cwnd, rwnd)</li><li>ssthresh = switch point</li></ul></div>
+<div><h4>Phases</h4><ul><li>Slow Start → exponential (×2 per RTT)</li><li>CA → linear (+1 MSS per RTT)</li><li>AIMD → sawtooth, fairness</li></ul></div>
+<div><h4>Loss reactions</h4><ul><li>3 dup ACKs → Fast Retransmit</li><li>Timeout → cwnd = 1, Slow Start (both)</li><li>Tahoe: 3 dup → 1 MSS</li><li>Reno: 3 dup → half + Fast Recovery</li></ul></div>
+<div><h4>Modern</h4><ul><li>CUBIC default today, BBR model-based</li><li>ECN marks instead of drops</li></ul></div>
+<div><h4>Shaping <span class="add">+ Added</span></h4><ul><li>Leaky bucket → constant output rate</li><li>Token bucket → bursts up to capacity C</li><li>Burst time S = C / (M − r)</li></ul></div>
+</div>
+</div>
+</article>
+
+<!-- ================= CH: TERMINATION ================= -->
+<article class="ch" data-ch="termination" hidden>
+<div class="pane notes">
+<p>Finishing the TCP lifecycle: establishment → data transfer → termination.</p>
+<section><h2 id="tm-why"><span class="num">12.1</span>Why 4 steps?</h2>
+<p>TCP is <strong>full-duplex</strong>: each direction is closed <strong>independently</strong>. The client can say "I'm finished sending" while the server still has data to send. So the server ACKs the client's FIN, keeps sending, and sends its own FIN later.</p>
+<div class="wg" data-wg="seq-fin"></div>
+</section>
+
+<section><h2 id="tm-steps"><span class="num">12.2</span>Step by step</h2>
+<div class="tbl"><table><thead><tr><th>Step</th><th>Direction</th><th>Fields</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>1. FIN</td><td>Client → Server</td><td class="n">FIN=1, Seq=x</td><td>"I have no more data to send."</td></tr>
+<tr><td>2. ACK</td><td>Server → Client</td><td class="n">Ack=x+1</td><td>"Got your FIN." Server may still send data.</td></tr>
+<tr><td>3. FIN</td><td>Server → Client</td><td class="n">FIN=1, Seq=y</td><td>"I'm also finished sending."</td></tr>
+<tr><td>4. ACK</td><td>Client → Server</td><td class="n">Ack=y+1</td><td>Closed (client waits in TIME_WAIT).</td></tr>
+</tbody></table></div>
+<p>FIN consumes one sequence number, just like SYN: FIN Seq = 5000 → ACK = 5001.</p>
+<p><span class="add">+ Added</span> If the server has nothing left to send, steps 2 and 3 are often <strong>combined</strong> into one FIN+ACK, so you'll see a 3-segment close in packet captures.</p>
+<p><strong>Half-close</strong>: FIN means "I've finished <em>sending</em>", not "I'll stop receiving". After the client's FIN, the server can still send DATA until it sends its own FIN. Possible because TCP is full-duplex.</p>
+</section>
+
+<section><h2 id="tm-tw"><span class="num">12.3</span>TIME_WAIT</h2>
+<p>After sending the final ACK, the active closer doesn't forget the connection immediately. It enters <strong>TIME_WAIT</strong> for <strong>2 × MSL</strong> (Maximum Segment Lifetime), commonly 60 s total on Linux, though the exact value is implementation-dependent.</p>
+<div class="vs"><div><h4>Reason 1: delayed old packets</h4>An old segment from this connection may still be in the network. Waiting ensures it dies before a new connection with the same 4-tuple could receive it.</div><div><h4>Reason 2: retransmit the final ACK</h4>If the last ACK is lost, the server resends its FIN. A client still in TIME_WAIT can ACK it again instead of answering with RST.</div></div>
+<p><strong>Who enters TIME_WAIT?</strong> The endpoint that performs the <strong>active close</strong> (sends the first FIN), which sends the final ACK. Usually the client, but don't memorise "client always"; it depends on who closes first.</p>
+<p><span class="add">+ Added</span> The passive side goes ESTABLISHED → <strong>CLOSE_WAIT</strong> (got FIN, waiting for its own app to call close) → <strong>LAST_ACK</strong> → CLOSED. Lots of sockets stuck in CLOSE_WAIT = an application bug (it never closes). Lots in TIME_WAIT on a busy server = it is the active closer; mitigations include connection reuse (keep-alive) and <code>SO_REUSEADDR</code>.</p>
+</section>
+
+<section><h2 id="tm-rst"><span class="num">12.4</span>FIN vs RST</h2>
+<div class="tbl"><table><thead><tr><th>FIN</th><th>RST</th></tr></thead><tbody>
+<tr><td>Graceful close</td><td>Abrupt reset</td></tr><tr><td>Normal termination</td><td>Error / forced termination</td></tr><tr><td>Remaining data still delivered</td><td>Buffered data discarded immediately</td></tr><tr><td>Part of 4-way termination</td><td>Not part of the normal handshake; no ACK expected</td></tr><tr><td>Consumes 1 sequence number</td><td>No TIME_WAIT</td></tr></tbody></table></div>
+<p>RST happens when: connecting to a port nobody listens on (the "connection refused" error), a serious protocol error, a segment for a connection that doesn't exist, or an application aborting (e.g. <code>SO_LINGER</code> with timeout 0).</p>
+</section>
+
+<section><h2 id="tm-states"><span class="num">12.5</span>Full TCP state lifecycle</h2>
+<div class="wg" data-wg="tcpstates"></div>
+</section>
+
+<section><h2 id="tm-map"><span class="num">12.6</span>TCP complete revision map</h2>
+<ul class="tree"><li><span class="t">TCP</span><ul>
+<li><span class="t">Establishment</span> <em>3-way: SYN · SYN-ACK · ACK</em></li>
+<li><span class="t">Data transfer</span><ul><li>Seq numbers → ACKs → reliability</li><li>Sliding window → flow control (rwnd)</li><li>Congestion control (cwnd)<ul><li>Slow Start</li><li>AIMD / Congestion Avoidance</li><li>Fast Retransmit → Tahoe / Reno (Fast Recovery)</li></ul></li></ul></li>
+<li><span class="t">Termination</span> <em>4-way: FIN · ACK · FIN · ACK → TIME_WAIT</em></li></ul></li></ul>
+</section>
+</div>
+<div class="pane quick-sheet" hidden>
+<div class="quick-grid">
+<div><h4>Close</h4><ul><li>FIN → ACK → FIN → ACK</li><li>4 steps because full-duplex (half-close)</li><li>FIN consumes 1 seq</li></ul></div>
+<div><h4>TIME_WAIT</h4><ul><li>2 × MSL, active closer</li><li>Kills delayed old segments</li><li>Can re-send final ACK</li></ul></div>
+<div><h4>FIN vs RST</h4><ul><li>FIN graceful, RST abrupt</li><li>RST: closed port, error, abort</li></ul></div>
+<div><h4>States</h4><ul><li>Active: FIN_WAIT_1 → FIN_WAIT_2 → TIME_WAIT</li><li>Passive: CLOSE_WAIT → LAST_ACK</li></ul></div>
+</div>
+</div>
+</article>

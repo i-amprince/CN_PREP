@@ -1,0 +1,6143 @@
+Topic 1: CN Architecture — OSI + TCP/IP
+
+First, build the mental map.
+
+1. OSI 7 Layers
+7. Application
+6. Presentation
+5. Session
+4. Transport
+3. Network
+2. Data Link
+1. Physical
+
+For placements, remember what problem each layer solves:
+
+Layer	Main job	Examples
+Application	Network services to applications	HTTP, DNS, FTP, SMTP
+Presentation	Data format, encryption, compression	TLS/SSL, encoding
+Session	Establish/manage sessions	Session management
+Transport	Process-to-process delivery	TCP, UDP
+Network	Host-to-host delivery + routing	IP, ICMP
+Data Link	Node-to-node delivery	Ethernet, Wi-Fi
+Physical	Send raw bits	Cables, radio
+2. TCP/IP model
+
+Usually:
+
+Application
+Transport
+Internet
+Network Access
+
+Mapping:
+
+OSI                         TCP/IP
+
+Application ─────┐
+Presentation ────┤ → Application
+Session ─────────┘
+
+Transport ─────────→ Transport
+
+Network ───────────→ Internet
+
+Data Link ─────────┐
+Physical ──────────┘ → Network Access
+3. Very important: "Who communicates with whom?"
+
+This is a common interview concept.
+
+Application ↔ Application
+Transport   ↔ Transport
+Network     ↔ Network
+Data Link   ↔ Data Link
+Physical    ↔ Physical
+
+But physically, data travels down the sender's layers, across the network, and up the receiver's layers.
+
+Example:
+
+HTTP data
+   ↓
+TCP segment
+   ↓
+IP packet
+   ↓
+Ethernet frame
+   ↓
+Bits
+
+At the receiver:
+
+Bits
+ ↓
+Frame
+ ↓
+Packet
+ ↓
+Segment
+ ↓
+HTTP data
+
+Remember the encapsulation:
+
+Application Data
+      ↓
+TCP Header + Data       = Segment
+      ↓
+IP Header + Segment     = Packet
+      ↓
+MAC Header + Packet     = Frame
+      ↓
+Bits
+
+This becomes very important later when we discuss TCP, IP, MAC, ARP and switching.
+
+4. Devices by layer
+
+This is worth memorizing.
+
+Hub
+
+Physical layer
+
+Simply broadcasts bits to all ports.
+
+       Hub
+    /   |   \
+   A    B    C
+
+No intelligence about MAC/IP.
+
+Switch
+
+Data Link layer
+
+Uses a MAC address table.
+
+MAC Address → Port
+AA:AA       → 1
+BB:BB       → 2
+CC:CC       → 3
+
+It forwards Ethernet frames based on destination MAC.
+
+Technically, Layer-3 switches also exist, but ordinary Ethernet switching is Layer 2.
+
+Router
+
+Network layer
+
+Uses IP addresses and routing tables.
+
+Network A
+    |
+  Router
+    |
+Network B
+
+Router decides:
+
+"Which next hop/network should this packet go to?"
+
+Quick mapping
+Hub     → Physical → Bits
+Switch  → Data Link → MAC
+Router  → Network → IP
+5. MAC address — important correction
+
+You mentioned "MAC has 2 layers."
+
+The Data Link layer itself has two sublayers:
+
+Data Link Layer
+       |
+       ├── LLC
+       │   Logical Link Control
+       │
+       └── MAC
+           Media Access Control
+LLC
+
+Responsible for things like:
+
+multiplexing protocols
+flow/error-related control between LLC entities
+MAC
+
+Responsible mainly for:
+
+MAC addressing
+controlling access to the shared transmission medium
+framing-related functions
+
+This is where CSMA/CD and CSMA/CA come in.
+
+So remember:
+
+Data Link
+   ├── LLC
+   └── MAC
+        ├── MAC address
+        └── Medium access
+             ├── CSMA/CD
+             └── CSMA/CA
+
+We'll go deep into these when we reach Data Link.
+
+6. One more important distinction
+
+Don't mix these:
+
+IP address
+
+Identifies a device/interface at the network layer.
+
+Used for:
+
+Routing across networks
+MAC address
+
+Used at the Data Link layer.
+
+Used for:
+
+Delivery within the local network/link
+
+Example:
+
+Your laptop
+IP  = 192.168.1.10
+MAC = AA:BB:CC:DD:EE:FF
+
+When your packet crosses multiple routers:
+
+Laptop → Router → Router → Server
+
+The IP addresses generally remain the source/destination IPs (ignoring NAT), while the MAC addresses change hop-by-hop.
+
+This is a VERY important interview concept.
+
+7. The mental model we'll use
+
+Whenever you see a networking problem, ask:
+
+What data?
+ ↓
+Which process?
+ ↓
+Which host/network?
+ ↓
+Which local device?
+ ↓
+How are bits physically transmitted?
+
+That naturally leads to:
+
+Application → Process/data
+Transport   → Process-to-process
+Network     → Host-to-host
+Data Link   → Node-to-node
+Physical    → Bits
+
+
+
+2. DATA LINK LAYER — ETHERNET, MAC & MEDIUM ACCESS
+
+This is an important placement topic because MAC, Ethernet, CSMA/CD, CSMA/CA, frames, collision domains, and switching all connect here.
+
+1. What does Data Link Layer do?
+
+The Data Link layer provides node-to-node delivery.
+
+Its main responsibilities:
+
+Framing
+MAC addressing
+Error detection
+Medium access control
+Flow control in some link-layer protocols
+
+Think:
+
+Network Layer
+     ↓
+IP packet
+     ↓
+Data Link Layer
+     ↓
+Ethernet Frame
+     ↓
+Physical Layer
+     ↓
+Bits
+2. Data Link Layer has 2 Sublayers
+DATA LINK
+   |
+   ├── LLC (Logical Link Control)
+   |
+   └── MAC (Media Access Control)
+LLC
+
+Provides an interface between Network Layer and MAC.
+
+MAC
+
+Responsible for:
+
+MAC addressing
+Controlling access to the shared medium
+Frame-related functions
+
+CSMA/CD and CSMA/CA operate at the MAC sublayer.
+
+3. MAC Address
+
+A MAC address identifies a network interface at the Data Link layer.
+
+Example:
+
+48:2A:E3:91:AB:10
+
+Usually represented as 48 bits = 6 bytes.
+
+48 : 2A : E3 : 91 : AB : 10
+
+Important:
+
+IP is used for routing between networks.
+MAC is used for delivery on the local link/network.
+
+4. Ethernet Frame
+
+An Ethernet frame roughly looks like:
+
++----------+----------+---------+------+------+
+| Preamble | Dest MAC | Src MAC | Type | Data |
++----------+----------+---------+------+------+
+                                      ↓
+                                    FCS
+
+Important fields:
+
+Destination MAC
+Source MAC
+Type/Length
+Data
+FCS
+FCS
+
+Frame Check Sequence
+
+Used for error detection, typically using CRC.
+
+It detects whether the frame was corrupted during transmission.
+
+5. Hub vs Switch
+
+This is a very common interview question.
+
+Hub
+
+Works at Physical layer.
+
+If A sends:
+
+       Hub
+    /   |   \
+   A    B    C
+
+Hub sends the signal to all ports.
+
+Switch
+
+Normally works at Data Link layer.
+
+It maintains a:
+
+MAC Address → Port
+
+table.
+
+Example:
+
+AA:AA → Port 1
+BB:BB → Port 2
+CC:CC → Port 3
+
+If A wants to send to B:
+
+A → Switch → B
+
+The switch doesn't unnecessarily send the frame to every port if it already knows B's location.
+
+6. How does a switch learn MAC addresses?
+
+This is important.
+
+Suppose:
+
+A ---- Switch ---- B
+
+A sends a frame to B.
+
+The switch sees:
+
+Source MAC = A
+Incoming Port = 1
+
+So it learns:
+
+A → Port 1
+
+Then it checks destination MAC B.
+
+If B is unknown:
+
+Unknown destination
+        ↓
+Flood frame
+        ↓
+All ports except incoming port
+
+When B replies, the switch learns:
+
+B → Port 2
+
+Now:
+
+A → B
+
+can be directly forwarded to Port 2.
+
+Key point
+
+Switch learns from SOURCE MAC, forwards based on DESTINATION MAC.
+
+That's a classic interview line.
+
+7. Collision Domain vs Broadcast Domain
+
+Very important.
+
+Collision Domain
+
+A region where transmitted frames can collide.
+
+Hub
+
+All devices share the same collision domain:
+
+ A
+ |
+Hub
+ |\
+ B C
+
+One collision domain.
+
+Switch
+
+Each switch port is generally a separate collision domain.
+
+ A ─┐
+    Switch
+ B ─┤
+ C ─┘
+
+A, B and C are in separate collision domains.
+
+Broadcast Domain
+
+A group of devices that receive a Layer-2 broadcast.
+
+A router separates broadcast domains.
+
+Network A
+    |
+ Router
+    |
+Network B
+
+A broadcast from Network A does not normally cross the router.
+
+Quick memory
+Switch → separates collision domains
+Router → separates broadcast domains
+8. Why do we need CSMA?
+
+Imagine many computers connected to the same shared medium.
+
+If everyone transmits whenever they want:
+
+A ───────┐
+         ├── Shared medium
+B ───────┘
+
+A and B might transmit simultaneously.
+
+Their signals collide.
+
+So we need a mechanism to decide:
+
+When can I transmit?
+
+That's where CSMA comes in.
+
+9. CSMA
+
+Carrier Sense Multiple Access
+
+Break it down:
+
+Carrier Sense
+
+Before transmitting:
+
+"Is someone already transmitting?"
+
+Multiple Access
+
+Multiple devices share the same medium.
+
+So:
+
+Listen → If free → Transmit
+
+But there's still a problem.
+
+Two devices may both check at almost the same time:
+
+A: Medium free → transmit
+B: Medium free → transmit
+                   ↓
+                Collision
+
+That's where CD and CA come in.
+
+10. CSMA/CD
+
+Carrier Sense Multiple Access with Collision Detection
+
+Historically associated with shared, half-duplex Ethernet.
+
+Process:
+
+1. Listen to medium
+        ↓
+2. If busy → wait
+        ↓
+3. If free → transmit
+        ↓
+4. During transmission, detect collision
+        ↓
+5. If collision → stop
+        ↓
+6. Wait random backoff
+        ↓
+7. Retry
+Collision Detection
+
+The device can detect:
+
+"My transmission collided."
+
+Then it stops transmitting.
+
+11. Binary Exponential Backoff
+
+This is the algorithmic part you should remember.
+
+After collisions, devices don't immediately retry.
+
+They choose a random backoff time.
+
+After repeated collisions, the possible waiting range increases exponentially.
+
+Conceptually:
+
+Collision 1 → choose from small range
+Collision 2 → larger range
+Collision 3 → even larger range
+...
+
+This reduces the probability that the same devices collide again.
+
+Interview point
+
+CSMA/CD uses binary exponential backoff after collision.
+
+12. CSMA/CA
+
+Carrier Sense Multiple Access with Collision Avoidance
+
+Used primarily in Wi-Fi (IEEE 802.11).
+
+Why not simply use collision detection?
+
+Because in wireless networks, detecting a collision while transmitting is difficult due to the nature of wireless transmission and the transmitter's own signal.
+
+So Wi-Fi tries to avoid collisions before they happen.
+
+Simplified:
+
+Sense channel
+     ↓
+If busy → wait
+     ↓
+If free → random backoff
+     ↓
+Transmit
+     ↓
+Wait for ACK
+
+If ACK isn't received:
+
+Probably transmission failed
+        ↓
+Backoff
+        ↓
+Retry
+13. CSMA/CD vs CSMA/CA
+CSMA/CD	CSMA/CA
+Collision Detection	Collision Avoidance
+Traditional shared Ethernet	Wi-Fi
+Detect collision after/during transmission	Try to avoid collision
+Collision → stop + backoff	Random backoff + ACK
+Half-duplex Ethernet	Wireless LAN
+Very important modern note
+
+Modern switched Ethernet is generally full-duplex, so collisions don't occur on a dedicated switch link.
+
+Therefore:
+
+CSMA/CD is mainly a historical/legacy Ethernet concept today, but it remains important for interviews and understanding Ethernet.
+
+14. Hidden Terminal Problem
+
+Important for Wi-Fi.
+
+Imagine:
+
+A ---- B ---- C
+
+A and C cannot hear each other, but both can communicate with B.
+
+A thinks:
+
+"Channel is free."
+
+C also thinks:
+
+"Channel is free."
+
+Both transmit to B.
+
+A ----→ B ←---- C
+       COLLISION
+
+This is the hidden terminal problem.
+
+Wi-Fi can use:
+
+RTS → Request To Send
+CTS → Clear To Send
+
+to reduce this problem.
+
+A → RTS → B
+A ← CTS ← B
+A → DATA → B
+A ← ACK ← B
+
+Other nearby devices hearing CTS can stay silent.
+
+15. One big picture
+
+You should now be able to connect:
+
+Data Link Layer
+       |
+       ├── LLC
+       |
+       └── MAC
+            |
+            ├── MAC Address
+            |
+            ├── Ethernet
+            |     └── Frame
+            |
+            └── Medium Access
+                  |
+                  ├── CSMA/CD
+                  |     └── Binary Exponential Backoff
+                  |
+                  └── CSMA/CA
+                        ├── Random Backoff
+                        ├── ACK
+                        └── RTS/CTS
+
+
+NETWORK LAYER — IP ADDRESSING, ARP & ROUTING BASICS
+
+Now we move from local delivery (MAC) to delivery between different networks (IP).
+
+1. What does the Network Layer do?
+
+Main responsibilities:
+
+Logical addressing → IP addresses
+Routing
+Packet forwarding
+Internetwork communication
+
+Think:
+
+Data Link → "Which device on this local network?"
+Network   → "Which network should this packet go to?"
+
+Example:
+
+Laptop → Home Router → ISP Router → Google Server
+
+The Network layer helps the packet travel across these networks.
+
+2. IP Address
+
+An IP address identifies a network interface logically.
+
+IPv4
+192.168.1.10
+
+IPv4 = 32 bits
+
+8 bits . 8 bits . 8 bits . 8 bits
+
+Each section ranges from:
+
+0 → 255
+IPv6
+
+IPv6 = 128 bits
+
+Example:
+
+2001:0db8:85a3::8a2e:0370:7334
+
+Main reason for IPv6:
+
+IPv4 has a limited address space.
+
+3. Network Address vs Host Address
+
+Consider:
+
+192.168.1.10/24
+
+/24 means:
+
+First 24 bits → Network
+Last 8 bits  → Host
+
+So:
+
+Network = 192.168.1.0
+Host    = 10
+
+For /24:
+
+Network address = 192.168.1.0
+First usable    = 192.168.1.1
+Last usable     = 192.168.1.254
+Broadcast       = 192.168.1.255
+
+This leads to subnetting, which we'll cover separately and properly because it's a common placement topic.
+
+4. Private vs Public IP
+Private IP
+
+Used inside local networks.
+
+Common ranges:
+
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
+
+Example:
+
+192.168.1.10
+
+is private.
+
+Public IP
+
+Used for communication over the public Internet.
+
+Your home devices generally don't each need their own public IPv4 address because of NAT.
+
+5. NAT
+
+Network Address Translation
+
+Suppose:
+
+Laptop
+192.168.1.10
+      |
+      ↓
+Router
+Public IP: 49.x.x.x
+      |
+   Internet
+
+Laptop sends:
+
+Source = 192.168.1.10
+
+Router translates it to its public address.
+
+Conceptually:
+
+192.168.1.10:5000
+        ↓
+49.x.x.x:30001
+
+The router maintains a translation table so it knows where the response should go.
+
+Why NAT?
+
+Main reasons:
+
+Allows private IPs to communicate through a public IP
+Helps conserve IPv4 addresses
+6. ARP — Very Important
+
+ARP = Address Resolution Protocol
+
+Purpose:
+
+Find the MAC address corresponding to an IPv4 address on the local network.
+
+Suppose:
+
+A:
+IP  = 192.168.1.10
+MAC = AA-AA
+
+B:
+IP  = 192.168.1.20
+MAC = BB-BB
+
+A wants to send something to B.
+
+A knows:
+
+B's IP = 192.168.1.20
+
+But Ethernet needs:
+
+B's MAC
+
+So A sends an ARP Request:
+
+"Who has 192.168.1.20?"
+
+This is a broadcast.
+
+A ───────→ Broadcast
+           ↓
+       Everyone receives
+
+B recognizes its IP and sends an ARP Reply:
+
+"192.168.1.20 is BB-BB"
+
+Now A stores:
+
+192.168.1.20 → BB-BB
+
+in its ARP cache.
+
+7. ARP Request vs ARP Reply
+Request
+
+Usually:
+
+Broadcast
+
+Because A doesn't know B's MAC.
+
+Reply
+
+Usually:
+
+Unicast
+
+Because B now knows exactly who asked.
+
+So:
+
+ARP Request → Broadcast
+ARP Reply   → Unicast
+
+Very common interview question.
+
+8. What if destination is outside my network?
+
+This is VERY important.
+
+Suppose:
+
+Laptop:
+192.168.1.10
+
+Google:
+142.x.x.x
+
+Your laptop realizes:
+
+Google isn't in my local subnet.
+
+So it doesn't ARP for Google's MAC.
+
+Instead, it needs the MAC address of the default gateway/router.
+
+Example:
+
+Laptop
+192.168.1.10
+     |
+     | MAC of router
+     ↓
+Router
+192.168.1.1
+     |
+     ↓
+Internet
+
+So the laptop ARPs:
+
+"Who has 192.168.1.1?"
+
+It gets:
+
+192.168.1.1 → Router MAC
+
+Then sends the Ethernet frame to the router.
+
+This is a VERY important concept:
+
+For an external destination, your host sends the frame to the router's MAC, not the remote server's MAC.
+
+9. MAC changes, IP usually doesn't
+
+Suppose:
+
+Laptop → Router 1 → Router 2 → Router 3 → Server
+
+At each hop:
+
+MAC addresses
+
+Change.
+
+Laptop → Router 1
+Source MAC = Laptop
+Dest MAC   = Router 1
+
+Router 1 → Router 2
+Source MAC = Router 1
+Dest MAC   = Router 2
+
+and so on.
+
+IP addresses
+
+Normally remain:
+
+Source IP = Laptop
+Destination IP = Server
+
+ignoring things such as NAT.
+
+This is one of the best ways to distinguish Layer 2 and Layer 3.
+
+10. Routing
+
+Now the router receives an IP packet.
+
+It checks:
+
+Destination IP
+
+and looks at its routing table.
+
+Example:
+
+Destination       Next Hop
+192.168.1.0/24    Direct
+10.0.0.0/8        Router A
+172.16.0.0/16     Router B
+0.0.0.0/0         Router C
+
+Router chooses where to forward the packet.
+
+11. Default Route
+0.0.0.0/0
+
+means essentially:
+
+If no more specific route matches, send it here.
+
+This is called the default route.
+
+Example:
+
+Destination = Google
+
+No specific route
+       ↓
+Default route
+       ↓
+ISP router
+12. Longest Prefix Matching
+
+This is an important routing algorithm/concept.
+
+Suppose routing table contains:
+
+10.0.0.0/8
+10.1.0.0/16
+10.1.2.0/24
+
+Destination:
+
+10.1.2.50
+
+All three might match.
+
+Router chooses:
+
+10.1.2.0/24
+
+because it has the longest prefix.
+
+Rule
+
+More specific route wins.
+
+/24 > /16 > /8
+
+This is worth remembering for interviews.
+
+13. TTL
+
+Every IPv4 packet has a TTL — Time To Live field.
+
+At each router:
+
+TTL = TTL - 1
+
+If TTL becomes zero, the packet is discarded.
+
+Why?
+
+To prevent packets from endlessly circulating due to routing loops.
+
+Example:
+
+Router A → Router B → Router C → Router A → ...
+
+TTL eventually reaches zero.
+
+14. ICMP
+
+Internet Control Message Protocol
+
+Used for network diagnostic/error messages.
+
+Famous examples:
+
+ping
+
+Uses:
+
+ICMP Echo Request
+ICMP Echo Reply
+traceroute
+
+Uses TTL manipulation and ICMP responses to discover the path through routers.
+
+So:
+
+ping       → ICMP
+traceroute → TTL + ICMP
+🔥 Placement Must-Remember
+IP → logical addressing + routing
+
+MAC → local/link delivery
+
+ARP → IPv4 address → MAC address
+
+ARP Request → Broadcast
+ARP Reply → Usually Unicast
+
+External destination
+→ ARP for default gateway
+→ send frame to router's MAC
+
+MAC → changes hop-by-hop
+
+IP → normally remains end-to-end
+
+Router → routing table
+
+0.0.0.0/0 → default route
+
+Longest prefix → more specific route wins
+
+TTL → prevents infinite routing loops
+
+ping → ICMP Echo Request/Reply
+One interview scenario to lock everything together:
+
+Your PC wants to access google.com. Google is outside your local network. What happens at Layer 2 and Layer 3?
+
+DNS gives Google's IP
+        ↓
+PC checks destination is outside subnet
+        ↓
+Finds default gateway
+        ↓
+ARP → gets gateway's MAC
+        ↓
+IP packet:
+Source IP = PC
+Dest IP   = Google
+        ↓
+Ethernet frame:
+Source MAC = PC
+Dest MAC   = Router
+        ↓
+Router forwards packet
+        ↓
+MAC addresses change at every hop
+        ↓
+IP packet continues toward Google
+
+
+5. NETWORK LAYER — ROUTING & ROUTING ALGORITHMS
+
+Now we get into the algorithm-heavy part of Computer Networks. This is important for placements because interviewers often connect routing tables → routing algorithms → Dijkstra/Bellman-Ford → RIP/OSPF/BGP.
+
+1. What is Routing?
+
+Routing means:
+
+Finding a path from a source network to a destination network.
+
+Example:
+
+A ─── R1 ─── R2 ─── R3 ─── B
+
+A packet from A to B needs a path:
+
+A → R1 → R2 → R3 → B
+Routing vs Forwarding
+
+Don't mix these.
+
+Routing:
+
+Decides the path.
+
+Forwarding:
+
+Actually sends the packet to the next hop.
+
+Routing   → "Which path?"
+Forwarding → "Send it through this interface."
+2. Routing Table
+
+A router maintains a routing table like:
+
+Destination       Next Hop       Interface
+192.168.1.0/24    Direct         eth0
+10.0.0.0/8        192.168.2.1    eth1
+172.16.0.0/16     192.168.3.1    eth2
+0.0.0.0/0         ISP            eth3
+
+When a packet arrives:
+
+Destination IP
+      ↓
+Check routing table
+      ↓
+Longest prefix match
+      ↓
+Choose next hop
+      ↓
+Forward packet
+3. Static vs Dynamic Routing
+Static Routing
+
+Administrator manually configures routes.
+
+Network A → Router B
+
+Advantages:
+
+Simple
+Predictable
+No routing protocol overhead
+
+Disadvantages:
+
+Doesn't automatically adapt to failures
+Difficult to maintain in large networks
+Dynamic Routing
+
+Routers exchange information and automatically determine routes.
+
+Examples:
+
+RIP
+OSPF
+BGP
+4. Two Major Routing Algorithm Families
+
+This is important.
+
+Routing Algorithms
+       |
+       ├── Distance Vector
+       |
+       └── Link State
+5. Distance Vector
+
+Each router basically knows:
+
+"How far is each destination, and through which neighbor?"
+
+A router doesn't have the complete topology.
+
+It exchanges routing information with neighboring routers.
+
+Classic example:
+
+RIP
+
+Bellman-Ford
+
+Distance Vector routing is based on the idea behind the Bellman-Ford algorithm.
+
+The core idea:
+
+distance to destination
+=
+cost to neighbor
++
+neighbor's distance to destination
+
+Mathematically:
+
+D(x) = min [ c(x,v) + D(v) ]
+
+where v is a neighboring router.
+
+Simple example
+A ----1---- B ----2---- C
+ \                  /
+  ------5-----------
+
+From A to C:
+
+Direct:
+
+5
+
+Through B:
+
+1 + 2 = 3
+
+So:
+
+A → B → C
+
+is selected.
+
+6. Distance Vector Problem — Count to Infinity
+
+This is a very important interview concept.
+
+Suppose:
+
+A ---- B ---- C
+
+A's route to C:
+
+A → B → C
+
+Now C fails.
+
+Routers may temporarily give each other incorrect information:
+
+A thinks B knows C
+B thinks A knows C
+
+They keep increasing the distance:
+
+2 → 3 → 4 → 5 → ...
+
+This is called:
+
+Count-to-infinity problem
+
+Solutions
+Split Horizon
+
+Don't advertise a route back through the interface from which you learned it.
+
+Poison Reverse
+
+Advertise that route back with an infinite metric.
+
+These are commonly associated with Distance Vector routing.
+
+7. RIP
+
+Routing Information Protocol
+
+RIP is a Distance Vector routing protocol.
+
+Important facts:
+
+Metric = Hop Count
+Maximum usable hop count = 15
+16 = Infinity / unreachable
+
+So:
+
+1 hop → good
+5 hops → good
+15 hops → maximum
+16 hops → unreachable
+
+This is a common MCQ.
+
+8. Link State Routing
+
+Now the router has much more information.
+
+Each router builds a view of the network topology.
+
+A ---- B ---- C
+|      |      |
+D ---- E ---- F
+
+Routers distribute link-state information.
+
+Then each router calculates the shortest path itself.
+
+Main algorithm:
+
+Dijkstra's algorithm
+
+9. Dijkstra's Algorithm
+
+Suppose:
+
+A --2-- B
+|       |
+5       1
+|       |
+C --2-- D
+
+Starting from A:
+
+Initial:
+
+A = 0
+B = 2
+C = 5
+D = ∞
+
+Choose smallest unvisited:
+
+B = 2
+
+Through B:
+
+D = 2 + 1 = 3
+
+Now:
+
+A → B → D
+
+cost:
+
+3
+
+Dijkstra repeatedly chooses the currently closest unvisited node and relaxes its neighbors.
+
+Important difference
+
+Dijkstra:
+
+Link State
+
+Bellman-Ford:
+
+Distance Vector
+
+Memorize this pair.
+
+10. Dijkstra vs Bellman-Ford
+Dijkstra	Bellman-Ford
+Link State	Distance Vector
+Uses complete topology	Uses neighbor information
+Greedy approach	Relaxation-based
+Commonly associated with OSPF	Commonly associated with RIP
+Doesn't normally handle negative edges	Can handle negative edges
+Faster in typical routing use	More iterative
+
+For CN interviews, focus more on the routing relationship than generic algorithm theory.
+
+11. OSPF
+
+Open Shortest Path First
+
+OSPF is a Link State routing protocol.
+
+Uses:
+
+Dijkstra's Shortest Path First algorithm
+
+Metric:
+
+Cost, generally based on bandwidth.
+
+Important:
+
+RIP  → Distance Vector → Hop Count
+OSPF → Link State     → Cost
+
+OSPF is used for routing within an autonomous system.
+
+12. Autonomous System
+
+An Autonomous System (AS) is a network/network group under a common administrative control and routing policy.
+
+Example concept:
+
+        Internet
+           |
+   ┌───────┴────────┐
+   AS 1             AS 2
+
+Inside an AS:
+
+OSPF
+RIP
+
+Between different ASes:
+
+BGP
+
+This gives us:
+
+IGP → Inside an AS
+EGP → Between ASes
+
+Examples:
+
+IGP → OSPF, RIP
+EGP → BGP
+13. BGP
+
+Border Gateway Protocol
+
+BGP is the major routing protocol used between autonomous systems on the Internet.
+
+Think:
+
+AS 1 ←→ AS 2 ←→ AS 3
+          BGP
+
+Unlike RIP/OSPF, BGP isn't simply:
+
+"Find the shortest path."
+
+It considers routing policies and multiple path attributes.
+
+Important interview distinction:
+
+OSPF → routing inside an organization/AS
+BGP  → routing between autonomous systems
+14. Distance Vector vs Link State
+
+This is extremely important.
+
+Feature	Distance Vector	Link State
+Knowledge	Neighbor information	Network topology
+Main idea	Distance + direction	Complete topology
+Algorithm	Bellman-Ford	Dijkstra
+Example	RIP	OSPF
+Updates	To neighbors	Link-state advertisements
+Convergence	Generally slower	Generally faster
+Count-to-infinity	Yes	Not the same problem
+15. Routing Protocol Classification
+
+Keep this diagram in your notes:
+
+Routing Protocols
+       |
+       ├── IGP
+       │    |
+       │    ├── RIP
+       │    │    └── Distance Vector
+       │    │
+       │    └── OSPF
+       │         └── Link State
+       │
+       └── EGP
+            |
+            └── BGP
+                 └── Inter-AS routing
+16. One subtle but important point
+
+Don't say:
+
+"Dijkstra is the OSPF protocol."
+
+Incorrect.
+
+Correct:
+
+OSPF is a routing protocol that uses the Shortest Path First approach based on Dijkstra's algorithm.
+
+Similarly:
+
+RIP is a Distance Vector routing protocol based on the Bellman-Ford principle.
+
+🔥 Placement Must-Remember
+Routing → decides path
+Forwarding → sends packet to next hop
+
+Distance Vector → Bellman-Ford
+Link State → Dijkstra
+
+RIP → Distance Vector
+    → Hop count
+    → 15 max usable hops
+    → 16 = unreachable
+
+OSPF → Link State
+     → Dijkstra/SPF
+     → Cost
+
+BGP → Between Autonomous Systems
+
+And these three are worth remembering together:
+
+RIP
+ ↓
+Distance Vector
+ ↓
+Bellman-Ford
+ ↓
+Count-to-Infinity
+OSPF
+ ↓
+Link State
+ ↓
+Dijkstra
+ ↓
+Shortest Path
+BGP
+ ↓
+Between Autonomous Systems
+ ↓
+Policy-based routing
+Interview question you should be able to answer now:
+
+Why does OSPF generally converge faster than RIP?
+
+Because OSPF uses link-state information and each router builds the topology and calculates paths, whereas Distance Vector protocols exchange distance information iteratively with neighbors and can suffer from issues such as count-to-infinity.
+
+
+6. TRANSPORT LAYER — TCP, UDP, PORTS & MULTIPLEXING
+
+Now we move from host-to-host communication (IP) to process-to-process communication.
+
+This layer is one of the highest-priority CN topics for placements.
+
+1. What does Transport Layer do?
+
+Network layer:
+
+Gets data from one host to another host.
+
+Transport layer:
+
+Gets data from one process/application to another process.
+
+Example:
+
+Your Browser
+     ↓
+Your Laptop
+     ↓
+Internet
+     ↓
+Google Server
+     ↓
+Web Server Process
+
+IP gets the packet to the server.
+
+Port numbers get it to the correct application/process.
+
+2. Port Number
+
+A port identifies a process/service on a host.
+
+Example:
+
+IP = 142.x.x.x
+Port = 443
+
+means:
+
+Host + HTTPS service
+
+Common ports:
+
+Protocol	Port
+HTTP	80
+HTTPS	443
+FTP	20/21
+SSH	22
+DNS	53
+SMTP	25
+DHCP	67/68
+
+For placements, especially remember:
+
+HTTP  → 80
+HTTPS → 443
+DNS   → 53
+SSH   → 22
+3. Socket
+
+A socket is commonly identified using:
+
+IP address + Port number
+
+Example:
+
+192.168.1.10:5000
+
+For a TCP connection, the connection is uniquely identified by a 4-tuple:
+
+Source IP
+Source Port
+Destination IP
+Destination Port
+
+Example:
+
+192.168.1.10:5000
+        ↓
+142.250.x.x:443
+
+This lets one machine maintain many simultaneous connections.
+
+4. TCP vs UDP
+
+The two major Transport Layer protocols:
+
+Transport Layer
+      |
+      ├── TCP
+      |
+      └── UDP
+5. TCP
+
+Transmission Control Protocol
+
+TCP is:
+
+Connection-oriented
+Reliable
+Ordered
+Full-duplex
+Byte-stream oriented
+Has flow control
+Has congestion control
+Uses acknowledgements
+Retransmits lost data
+
+Think:
+
+"I care that the data reaches correctly and in order."
+
+6. UDP
+
+User Datagram Protocol
+
+UDP is:
+
+Connectionless
+Unreliable/best-effort
+No guaranteed ordering
+No retransmission mechanism at UDP level
+No TCP-style flow control
+No TCP-style congestion control
+Datagram-oriented
+
+Think:
+
+"Send it quickly; don't make the transport layer handle reliability."
+
+7. TCP vs UDP
+TCP	UDP
+Connection-oriented	Connectionless
+Reliable	Best-effort
+Ordered	No ordering guarantee
+ACKs	No TCP-style ACK mechanism
+Retransmission	No built-in retransmission
+Flow control	Yes
+Congestion control	Yes
+Byte stream	Datagram
+More overhead	Less overhead
+Important
+
+Don't say:
+
+UDP is always faster.
+
+Better:
+
+UDP has lower protocol overhead and doesn't perform TCP's connection setup, reliability, and congestion-control mechanisms, so it can be useful when low latency or application-controlled reliability is preferred.
+
+8. Where is UDP used?
+
+Common examples:
+
+DNS
+
+DNS commonly uses UDP.
+
+Client → DNS Server
+
+Why?
+
+Small request/response and low overhead.
+
+DNS can also use TCP in situations where needed.
+
+DHCP
+
+Uses UDP.
+
+Because a client may not yet have a configured IP address.
+
+Real-time applications
+
+Examples:
+
+Online gaming
+Voice calls
+Video streaming
+Live communication
+
+Why?
+
+Suppose you're in a live voice call.
+
+If one packet is lost:
+
+Packet 100 lost
+
+Waiting several seconds to retransmit old audio may be worse than simply continuing.
+
+9. TCP Segment
+
+TCP data gets encapsulated into a TCP segment.
+
+Simplified:
+
++-------------------+
+| Source Port       |
++-------------------+
+| Destination Port  |
++-------------------+
+| Sequence Number   |
++-------------------+
+| ACK Number        |
++-------------------+
+| Flags             |
++-------------------+
+| Window Size       |
++-------------------+
+| Data              |
++-------------------+
+
+You don't need to memorize every TCP header field immediately.
+
+But these are very important:
+
+Sequence Number
+Acknowledgement Number
+Flags
+Window Size
+
+We'll go deep into these in the next TCP section.
+
+10. UDP Datagram
+
+UDP header is much simpler:
+
++-------------------+
+| Source Port       |
++-------------------+
+| Destination Port  |
++-------------------+
+| Length            |
++-------------------+
+| Checksum          |
++-------------------+
+| Data              |
++-------------------+
+
+UDP header size:
+
+8 bytes
+
+TCP minimum header:
+
+20 bytes
+
+So UDP has considerably less header overhead.
+
+11. Multiplexing
+
+Suppose your laptop has:
+
+Chrome
+Spotify
+Discord
+
+All want to use the network simultaneously.
+
+Transport layer combines data from different applications and uses port numbers to distinguish them.
+
+Chrome  → 443
+Spotify → xxxx
+Discord → xxxx
+          ↓
+      Transport
+          ↓
+       Network
+
+This is multiplexing.
+
+12. Demultiplexing
+
+At the receiver:
+
+Network
+   ↓
+Transport
+   ↓
+Port number
+   ↓
+Correct application
+
+Example:
+
+Destination Port = 443
+        ↓
+HTTPS server process
+
+This is demultiplexing.
+
+So:
+
+Sender:
+Many applications
+      ↓
+Multiplexing
+
+Receiver:
+One network stream
+      ↓
+Demultiplexing
+      ↓
+Correct application
+13. Connection-Oriented vs Connectionless
+TCP
+
+Before actual data transfer:
+
+Connection establishment
+        ↓
+Data transfer
+        ↓
+Connection termination
+UDP
+Send datagram
+
+No transport-level connection establishment.
+
+That's why UDP is called connectionless.
+
+14. Reliability in TCP
+
+TCP provides reliability using several mechanisms:
+
+TCP Reliability
+      |
+      ├── Sequence Numbers
+      ├── ACKs
+      ├── Retransmission
+      ├── Checksum
+      └── Sliding Window
+
+Example:
+
+Sender sends:
+
+Seq 100
+Seq 200
+Seq 300
+
+Receiver acknowledges:
+
+ACK 200
+
+Meaning depends on TCP's byte-oriented sequence numbering; generally the ACK indicates the next byte expected.
+
+For example:
+
+ACK = 300
+
+means:
+
+"I have received everything up to byte 299; send me byte 300 next."
+
+This becomes important when we study TCP sequence numbers and sliding window.
+
+15. Flow Control vs Congestion Control
+
+Don't mix these — interviewers LOVE this distinction.
+
+Flow Control
+
+Problem:
+
+Sender is sending faster than the receiver can process.
+
+Sender
+  ↓↓↓↓↓↓↓
+Receiver
+  😵
+
+TCP uses the receiver window (rwnd) to control this.
+
+Congestion Control
+
+Problem:
+
+Too much traffic is being injected into the network.
+
+Many senders
+ ↓ ↓ ↓ ↓
+Network
+ 💥 congestion
+
+TCP uses mechanisms such as:
+
+Slow Start
+Congestion Avoidance
+Fast Retransmit
+Fast Recovery
+
+We'll cover these in a dedicated topic.
+
+Remember:
+Flow control
+→ Protect receiver
+
+Congestion control
+→ Protect network
+16. TCP Connection — Big Picture
+
+TCP communication:
+
+Client
+  |
+  | 3-way handshake
+  ↓
+Connection established
+  |
+  | Data transfer
+  ↓
+ACK / retransmission / flow control /
+congestion control
+  |
+  | Connection termination
+  ↓
+Connection closed
+
+The 3-way handshake deserves its own section because it has several common interview traps.
+
+🔥 Placement Must-Remember
+Transport Layer
+      |
+      ├── TCP
+      │    ├── Reliable
+      │    ├── Ordered
+      │    ├── Connection-oriented
+      │    ├── Flow control
+      │    └── Congestion control
+      │
+      └── UDP
+           ├── Connectionless
+           ├── Best-effort
+           ├── Low overhead
+           └── No TCP-style reliability
+IP address → identifies host/interface
+Port       → identifies process/service
+Socket     → IP + Port
+Multiplexing   → many applications → transport
+Demultiplexing → transport → correct application
+Flow control
+→ receiver protection
+
+Congestion control
+→ network protection
+
+7. TCP — 3-WAY HANDSHAKE, SEQUENCE NUMBERS & ACKNOWLEDGEMENTS
+
+This is one of the most frequently asked Computer Networks interview topics. Don't just memorize SYN → SYN-ACK → ACK; understand why each step exists.
+
+1. Why does TCP need a handshake?
+
+TCP is connection-oriented.
+
+Before sending application data, both sides need to establish a connection and synchronize important state, especially:
+
+Initial sequence numbers
+Connection state
+Both sides' ability to communicate
+
+The process is:
+
+Client                         Server
+
+   SYN  --------------------->
+
+        <---------------- SYN + ACK
+
+   ACK  --------------------->
+
+That's the 3-way handshake.
+
+2. Step 1 — SYN
+
+Client wants to establish a connection.
+
+Client → Server
+
+SYN = 1
+Seq = x
+
+Here x is the client's Initial Sequence Number (ISN).
+
+Conceptually:
+
+"I want to establish a TCP connection, and my starting sequence number is x."
+
+3. Step 2 — SYN + ACK
+
+Server receives the SYN.
+
+It responds:
+
+Server → Client
+
+SYN = 1
+ACK = 1
+Seq = y
+Ack = x + 1
+
+Meaning:
+
+"I received your SYN. My sequence number starts at y, and I expect your next sequence number to be x+1."
+
+Notice the server also sends its own ISN y.
+
+4. Step 3 — ACK
+
+Client responds:
+
+Client → Server
+
+ACK = 1
+Ack = y + 1
+
+Meaning:
+
+"I received your sequence number y. I'm ready."
+
+Now the connection is established.
+
+5. Why is it 3-Way and not 2-Way?
+
+This is a very common interview question.
+
+TCP needs both sides to know that the other side can send and receive and to synchronize sequence numbers in both directions.
+
+With:
+
+SYN
+← SYN-ACK
+
+the client knows:
+
+Server received my SYN and can communicate back.
+
+But the server still needs confirmation that:
+
+Client received my SYN-ACK.
+
+The third ACK provides that confirmation.
+
+So:
+
+1. Client → Server : SYN
+2. Server → Client : SYN + ACK
+3. Client → Server : ACK
+6. Sequence Numbers
+
+TCP is a byte-stream protocol.
+
+TCP assigns sequence numbers to bytes.
+
+Suppose:
+
+Initial Seq = 1000
+
+Suppose the sender sends:
+
+500 bytes
+
+Those bytes occupy sequence numbers approximately:
+
+1000 → 1499
+
+The receiver then acknowledges:
+
+ACK = 1500
+
+Meaning:
+
+"I have received everything before byte 1500. I expect byte 1500 next."
+
+Very important:
+
+TCP ACK number = next byte expected.
+
+7. SYN Consumes One Sequence Number
+
+This is a common interview/MCQ trap.
+
+Suppose:
+
+Client:
+SYN
+Seq = 100
+
+Server responds:
+
+ACK = 101
+
+Why?
+
+Because SYN consumes one sequence number.
+
+Similarly, FIN also consumes one sequence number.
+
+SYN → consumes 1
+FIN → consumes 1
+8. Example of Sequence + ACK
+
+Suppose:
+
+Client sends:
+Seq = 1000
+Data = 500 bytes
+
+Receiver gets all of it.
+
+Next expected byte:
+
+1000 + 500 = 1500
+
+So:
+
+ACK = 1500
+
+Then sender sends:
+
+Seq = 1500
+
+This is how TCP maintains ordered delivery.
+
+9. What if a segment is lost?
+
+Suppose sender sends:
+
+Seq 1000 → 1099
+Seq 1100 → 1199
+Seq 1200 → 1299
+
+But the second segment is lost.
+
+Receiver gets:
+
+1000 → 1099
+1200 → 1299
+
+It is still expecting:
+
+1100
+
+So it may repeatedly send:
+
+ACK = 1100
+
+These are duplicate ACKs.
+
+The sender can use duplicate ACKs as a signal that something may have been lost.
+
+This leads to:
+
+Fast Retransmit
+
+which we'll cover with congestion control.
+
+10. TCP Flags You Should Know
+
+TCP has several flags.
+
+For placements, focus on:
+
+SYN → connection establishment
+ACK → acknowledgement
+FIN → graceful termination
+RST → reset/abrupt termination
+PSH → push data to application
+URG → urgent data indication
+
+Most important:
+
+SYN
+ACK
+FIN
+RST
+11. SYN Flood Attack
+
+A useful security-related CN concept.
+
+Attacker sends many:
+
+SYN
+SYN
+SYN
+SYN
+SYN
+
+Server responds:
+
+SYN-ACK
+
+but attacker doesn't complete the handshake.
+
+Server keeps resources/state for these half-open connections.
+
+This can consume server resources.
+
+This is called:
+
+SYN Flood
+
+You don't need security details here; just understand the relationship with the TCP handshake.
+
+12. TCP Connection States
+
+You don't need every state memorized initially, but these are useful:
+
+CLOSED
+   ↓
+SYN-SENT
+   ↓
+ESTABLISHED
+
+Server side:
+
+LISTEN
+   ↓
+SYN-RECEIVED
+   ↓
+ESTABLISHED
+
+The most important state:
+
+ESTABLISHED
+
+means the connection is ready for normal data transfer.
+
+13. Why not just use one SYN and one ACK?
+
+Another way interviewers ask the same concept:
+
+Why can't TCP use a 2-way handshake?
+
+Because both sides need to establish their sequence-number state and confirm bidirectional communication.
+
+The third message confirms that the client received the server's response.
+
+14. TCP Handshake — Interview Diagram
+
+Keep this exact diagram in your notes:
+
+Client                              Server
+
+CLOSED                             LISTEN
+   |                                  |
+   | -------- SYN, Seq=x ------------>|
+   |                                  |
+   | <---- SYN+ACK, Seq=y, Ack=x+1 ---|
+   |                                  |
+   | -------- ACK, Ack=y+1 ---------->|
+   |                                  |
+   |          ESTABLISHED             |
+15. One Important Distinction
+TCP handshake
+3-way
+SYN
+SYN-ACK
+ACK
+TCP termination
+
+Usually:
+
+4-way
+FIN
+ACK
+FIN
+ACK
+
+Don't mix them.
+
+We'll cover termination later.
+
+🔥 Placement Must-Remember
+TCP 3-way handshake:
+
+1. SYN
+   Seq = x
+
+2. SYN + ACK
+   Seq = y
+   Ack = x+1
+
+3. ACK
+   Ack = y+1
+TCP ACK = next byte expected
+SYN consumes 1 sequence number
+FIN consumes 1 sequence number
+SYN → establish
+ACK → acknowledge
+FIN → graceful close
+RST → reset
+Duplicate ACKs
+      ↓
+Possible packet loss
+      ↓
+Fast Retransmit
+
+And the big mental model:
+
+TCP
+ ↓
+Handshake
+ ↓
+Sequence numbers
+ ↓
+ACKs
+ ↓
+Sliding window
+ ↓
+Flow control
+ ↓
+Loss detection
+ ↓
+Retransmission
+ ↓
+Congestion control
+
+8 . TCP — SLIDING WINDOW, FLOW CONTROL & RELIABLE DATA TRANSFER
+
+This topic connects sequence numbers, ACKs, retransmission, receiver window, and sliding window. It is the foundation for understanding TCP congestion control later.
+
+1. Why do we need a Sliding Window?
+
+Imagine TCP sends one segment and waits:
+
+Send → Wait ACK → Send → Wait ACK
+
+This is reliable, but slow.
+
+Instead, TCP allows multiple bytes/segments to be in flight before waiting for individual ACKs.
+
+Sender
+ |--- Segment 1 --->|
+ |--- Segment 2 --->|
+ |--- Segment 3 --->|
+ |--- Segment 4 --->|
+
+This is the basic idea of a sliding window.
+
+2. Stop-and-Wait vs Sliding Window
+Stop-and-Wait
+Send 1
+  ↓
+Wait ACK
+  ↓
+Send 2
+  ↓
+Wait ACK
+
+Very simple but inefficient, especially when network delay is large.
+
+Sliding Window
+Send 1 ──→
+Send 2 ──→
+Send 3 ──→
+Send 4 ──→
+
+      ← ACK
+
+Multiple packets/bytes can be in transit.
+
+This improves network utilization.
+
+3. TCP is Byte-Oriented
+
+TCP's window is fundamentally measured in bytes, not simply number of packets.
+
+Example:
+
+Sequence numbers:
+
+1000  1100  1200  1300  1400
+ |     |     |     |     |
+
+Suppose the current sending window allows:
+
+1000 → 1399
+
+The sender can send those bytes without waiting for additional ACKs.
+
+4. Flow Control
+
+Now the important distinction.
+
+Suppose:
+
+Sender →→→→→→→→ Receiver
+
+The sender can transmit very quickly.
+
+But the receiver has limited buffer space.
+
+If sender sends too much:
+
+Receiver buffer
+████████████████
+       FULL
+
+Data could be lost/overrun.
+
+TCP solves this using flow control.
+
+Flow control prevents the sender from overwhelming the receiver.
+
+5. Receive Window — rwnd
+
+The receiver advertises how much additional data it can accept.
+
+This is called:
+
+Receive Window (rwnd)
+
+Example:
+
+Receiver says:
+
+rwnd = 5000 bytes
+
+Meaning approximately:
+
+"You can have up to 5000 more bytes outstanding."
+
+The sender must respect this limit.
+
+6. Sender's Effective Window
+
+This is a VERY important formula.
+
+TCP's usable sending window is constrained by both:
+
+Receiver capacity
++
+Network congestion
+
+Conceptually:
+
+Effective Send Window = min(rwnd, cwnd)
+
+Where:
+
+rwnd = receiver's advertised window
+cwnd = congestion window
+
+This single formula connects flow control and congestion control.
+
+We'll use it again in the next topic.
+
+7. Flow Control vs Congestion Control
+
+Keep this distinction extremely clear:
+
+Flow Control
+Sender
+   ↓
+Receiver
+
+Question:
+
+Can the receiver handle this much data?
+
+Controlled using:
+
+rwnd
+Congestion Control
+Sender
+   ↓
+Network
+   ↓
+Many routers
+
+Question:
+
+Can the network handle this much traffic?
+
+Controlled using:
+
+cwnd
+
+So:
+
+rwnd → protects receiver
+cwnd → protects network
+8. Cumulative ACK
+
+TCP commonly uses cumulative acknowledgements.
+
+Suppose receiver receives:
+
+1000–1099
+1100–1199
+1200–1299
+
+It can send:
+
+ACK = 1300
+
+Meaning:
+
+Everything before byte 1300 has been received correctly.
+
+This is efficient because one ACK confirms a range of data.
+
+9. What if a Segment is Lost?
+
+Suppose:
+
+Sender:
+
+1000–1099
+1100–1199  ← LOST
+1200–1299
+1300–1399
+
+Receiver gets:
+
+1000–1099
+1200–1299
+1300–1399
+
+But it still expects:
+
+1100
+
+So it keeps sending:
+
+ACK = 1100
+
+These repeated ACKs are duplicate ACKs.
+
+10. Retransmission
+
+TCP can detect loss using:
+
+1. Timeout
+
+Sender waits for ACK.
+
+If ACK doesn't arrive before the retransmission timer expires:
+
+Timeout
+  ↓
+Retransmit
+2. Duplicate ACKs
+
+If sender receives multiple duplicate ACKs:
+
+ACK 1100
+ACK 1100
+ACK 1100
+
+it can infer that data after byte 1100 may have been lost.
+
+This leads to:
+
+Fast Retransmit
+
+We'll cover the exact threshold in the congestion-control topic.
+
+11. Why Sliding Window is called "Sliding"
+
+Suppose window initially covers:
+
+id="9otcjp"
+[1000 1010 1020 1030]
+
+Receiver acknowledges the first part.
+
+The window moves:
+
+id="nyy6na"
+        [1010 1020 1030 1040]
+
+Then:
+
+id="h6c3ta"
+              [1020 1030 1040 1050]
+
+So the window slides forward as data is acknowledged.
+
+12. Go-Back-N vs Selective Repeat
+
+These are important general sliding-window concepts.
+
+Go-Back-N
+
+Suppose:
+
+1 ✓
+2 ✓
+3 ✗
+4 received
+5 received
+
+If packet 3 is lost, sender may retransmit:
+
+3
+4
+5
+
+even though 4 and 5 were already received.
+
+Selective Repeat
+
+Only retransmit the missing packet:
+
+3
+
+This is more efficient.
+
+TCP nuance
+
+Don't blindly say:
+
+"TCP = Selective Repeat."
+
+Classic TCP uses cumulative ACKs and retransmission behavior that historically resembles Go-Back-N in some respects, while modern TCP can use SACK (Selective Acknowledgment) to identify received blocks and retransmit only missing data.
+
+For placements, remember:
+
+Cumulative ACK → normal TCP concept
+SACK → selectively tells sender which blocks arrived
+13. TCP SACK
+
+Selective Acknowledgment
+
+Suppose:
+
+1 ✓
+2 ✓
+3 ✗
+4 ✓
+5 ✓
+
+With SACK, receiver can tell sender:
+
+"I am missing 3, but I already have 4 and 5."
+
+So sender can retransmit only what is necessary.
+
+This reduces unnecessary retransmission.
+
+14. Window Example
+
+Suppose:
+
+rwnd = 10 KB
+cwnd = 6 KB
+
+Then:
+
+Effective Window
+= min(10 KB, 6 KB)
+= 6 KB
+
+So the sender should not have more than approximately 6 KB of unacknowledged data in flight due to these limits.
+
+If later:
+
+rwnd = 4 KB
+cwnd = 6 KB
+
+then:
+
+Effective Window = 4 KB
+
+Receiver is now the limiting factor.
+
+15. Important Terms
+Bytes in flight
+
+Data sent but not yet acknowledged.
+
+Example:
+
+Sent = 10 KB
+ACKed = 6 KB
+
+In-flight = 4 KB
+Window
+
+Maximum amount of data that can be outstanding under the current constraints.
+
+16. Reliability Mechanisms — Big Picture
+
+TCP reliability comes from several mechanisms working together:
+
+TCP Reliability
+       |
+       ├── Sequence Numbers
+       |
+       ├── ACKs
+       |
+       ├── Checksum
+       |
+       ├── Sliding Window
+       |
+       ├── Retransmission Timer
+       |
+       ├── Duplicate ACKs
+       |
+       └── SACK
+
+Don't think:
+
+"TCP is reliable because of ACK."
+
+It's the combination of these mechanisms.
+
+🔥 Placement Must-Remember
+Sliding Window
+→ multiple bytes can be in flight
+→ improves utilization
+Flow Control
+→ protects receiver
+→ rwnd
+Congestion Control
+→ protects network
+→ cwnd
+Effective Window
+= min(rwnd, cwnd)
+Cumulative ACK
+→ acknowledges all bytes up to a point
+→ ACK number = next byte expected
+Packet loss
+→ Timeout OR duplicate ACKs
+→ Retransmission
+SACK
+→ receiver tells sender which blocks were received
+→ avoids unnecessary retransmission
+One mental picture to keep:
+                 TCP Sender
+                     |
+             ┌───────┴───────┐
+             ↓               ↓
+         Flow Control   Congestion Control
+             ↓               ↓
+            rwnd            cwnd
+             └───────┬───────┘
+                     ↓
+             Effective Window
+             = min(rwnd,cwnd)
+                     ↓
+                  Network
+
+
+9. TCP CONGESTION CONTROL — SLOW START, AIMD, TAHOE, RENO & FAST RETRANSMIT
+
+This is one of the most important algorithm-heavy parts of Computer Networks for placements.
+
+The main problem:
+
+How much data should a TCP sender inject into the network without causing congestion?
+
+1. Flow Control vs Congestion Control
+
+Keep this distinction fixed:
+
+Flow Control
+     ↓
+Protects RECEIVER
+     ↓
+rwnd
+Congestion Control
+     ↓
+Protects NETWORK
+     ↓
+cwnd
+
+TCP's effective sending window is:
+
+Effective Window = min(rwnd, cwnd)
+2. Congestion Window — cwnd
+
+cwnd is maintained by the sender.
+
+It controls approximately how much unacknowledged data TCP can have in the network.
+
+Example:
+
+cwnd = 10 KB
+
+The sender can have roughly 10 KB of data in flight, subject to rwnd.
+
+3. Two Important Variables
+
+TCP congestion control traditionally uses:
+
+cwnd
+
+Congestion Window.
+
+Controls how much data can be in flight.
+
+ssthresh
+
+Slow Start Threshold.
+
+Determines when TCP transitions between:
+
+Slow Start
+      ↓
+Congestion Avoidance
+4. Slow Start
+
+Despite the name, Slow Start actually grows very quickly.
+
+Initially:
+
+cwnd = small
+
+For each round of successful acknowledgements, cwnd grows approximately exponentially.
+
+Simplified example:
+
+Round 1 → 1 MSS
+Round 2 → 2 MSS
+Round 3 → 4 MSS
+Round 4 → 8 MSS
+Round 5 → 16 MSS
+Round 6 → 32 MSS
+
+So:
+
+1 → 2 → 4 → 8 → 16 → 32
+
+This is roughly exponential growth per RTT.
+
+5. Why Slow Start?
+
+When a TCP connection begins, the sender doesn't know:
+
+"How much traffic can this network handle?"
+
+So it starts with a small congestion window and increases it while observing the network.
+
+Think:
+
+Small traffic
+     ↓
+No congestion?
+     ↓
+Increase
+     ↓
+No congestion?
+     ↓
+Increase more
+6. Slow Start → Congestion Avoidance
+
+Once:
+
+cwnd >= ssthresh
+
+TCP enters:
+
+Congestion Avoidance
+
+Now growth becomes much slower.
+
+Instead of:
+
+1 → 2 → 4 → 8 → 16
+
+it roughly follows:
+
+16 → 17 → 18 → 19 → 20
+
+approximately linear growth per RTT.
+
+7. AIMD
+
+Congestion avoidance commonly follows:
+
+Additive Increase, Multiplicative Decrease
+
+Additive Increase
+
+If network is working fine:
+
+cwnd += roughly 1 MSS per RTT
+
+So:
+
+10 → 11 → 12 → 13 → 14
+Multiplicative Decrease
+
+When significant congestion is detected:
+
+cwnd → roughly half
+
+Example:
+
+20 → 10
+
+This gives:
+
+AIMD
+├── Additive Increase
+└── Multiplicative Decrease
+8. What indicates congestion?
+
+TCP mainly reacts to:
+
+1. Timeout
+
+Strong indication of congestion/loss.
+
+2. Duplicate ACKs
+
+Can indicate a segment was lost while later segments arrived.
+
+The reaction depends on the TCP variant.
+
+9. Fast Retransmit
+
+Suppose:
+
+Packet 1 ✓
+Packet 2 ✓
+Packet 3 ✗
+Packet 4 ✓
+Packet 5 ✓
+
+Receiver keeps acknowledging the missing point.
+
+Sender receives duplicate ACKs.
+
+Traditionally, after 3 duplicate ACKs, TCP performs:
+
+Fast Retransmit
+
+without waiting for the retransmission timeout.
+
+3 duplicate ACKs
+       ↓
+Assume loss
+       ↓
+Retransmit immediately
+
+This is much faster than waiting for a timeout.
+
+10. Fast Recovery
+
+After fast retransmit, TCP can enter Fast Recovery, depending on the TCP variant.
+
+This is where Reno differs significantly from Tahoe.
+
+11. TCP Tahoe
+
+Simplified behavior:
+
+During normal operation
+Slow Start
+     ↓
+Congestion Avoidance
+On timeout
+
+Tahoe:
+
+ssthresh = cwnd / 2
+cwnd = 1 MSS
+
+Then:
+
+Slow Start again
+On 3 duplicate ACKs
+
+Tahoe also effectively:
+
+ssthresh = cwnd / 2
+cwnd = 1 MSS
+
+Then starts Slow Start again.
+
+So Tahoe is aggressive in reducing the sending rate after loss.
+
+12. TCP Reno
+
+Reno improves the reaction to 3 duplicate ACKs.
+
+On 3 duplicate ACKs:
+ssthresh = cwnd / 2
+cwnd ≈ ssthresh
+
+Then:
+
+Fast Recovery
+
+rather than dropping all the way to 1 MSS.
+
+This avoids unnecessarily returning to Slow Start when the network is still delivering data.
+
+13. Tahoe vs Reno
+
+🔥 Very important table
+
+Event	Tahoe	Reno
+3 duplicate ACKs	cwnd → 1 MSS	cwnd → roughly half
+Timeout	cwnd → 1 MSS	cwnd → 1 MSS
+Fast Retransmit	Yes	Yes
+Fast Recovery	No	Yes
+Slow Start after 3 dup ACK	Yes	No, enters Fast Recovery
+
+The exact implementation details can vary across TCP versions, but this is the classic placement-level distinction.
+
+14. The Most Important Graph
+
+You should remember the shape:
+
+cwnd
+ ^
+ |                     /\
+ |                    /  \
+ |           ________/    \____
+ |          /
+ |        /
+ |      /
+ |    /
+ |___/____________________________> time
+    SS       CA
+
+More conceptually:
+
+Slow Start:
+Exponential ↑
+
+Congestion Avoidance:
+Linear ↑
+
+Loss:
+Decrease
+15. Timeout vs 3 Duplicate ACKs
+
+This distinction is extremely important.
+
+Timeout
+
+TCP assumes serious congestion.
+
+Classic behavior:
+
+ssthresh = cwnd / 2
+cwnd = 1 MSS
+
+Then:
+
+Slow Start
+3 Duplicate ACKs
+
+TCP assumes a packet was probably lost, but the network is still delivering packets.
+
+Reno:
+
+ssthresh = cwnd / 2
+cwnd ≈ ssthresh
+      ↓
+Fast Recovery
+
+So:
+
+Timeout
+→ severe reaction
+
+3 duplicate ACKs
+→ less severe reaction in Reno
+16. Example
+
+Suppose:
+
+cwnd = 16 MSS
+ssthresh = 8 MSS
+
+TCP is in congestion avoidance.
+
+Then 3 duplicate ACKs occur.
+
+Reno:
+ssthresh = 16/2 = 8
+cwnd ≈ 8
+
+Then Fast Recovery.
+
+After recovery:
+
+8 → 9 → 10 → 11 → ...
+
+approximately linear growth.
+
+17. Timeout Example
+
+Same situation:
+
+cwnd = 16 MSS
+
+Timeout occurs.
+
+Then:
+
+ssthresh = 8 MSS
+cwnd = 1 MSS
+
+Now:
+
+1 → 2 → 4 → 8
+
+Slow Start until ssthresh.
+
+Then:
+
+8 → 9 → 10 → 11
+
+Congestion Avoidance.
+
+18. TCP Congestion Control Flow
+
+Put this in your notes:
+
+                 Start
+                   |
+                   ↓
+              Slow Start
+                   |
+             cwnd >= ssthresh
+                   |
+                   ↓
+         Congestion Avoidance
+                   |
+              Packet loss?
+              /          \
+            No            Yes
+                          |
+                 ┌────────┴────────┐
+                 ↓                 ↓
+              Timeout       3 Duplicate ACK
+                 |                 |
+                 ↓                 ↓
+          cwnd = 1 MSS       Fast Retransmit
+                 |                 |
+                 ↓                 ↓
+           Slow Start        Fast Recovery
+19. AIMD Graph
+
+Another important mental picture:
+
+cwnd
+ ^
+ |       /|       /|
+ |      / |      / |
+ |     /  |     /  |
+ |    /   |    /   |
+ |   /    |   /    |
+ |  /     |  /     |
+ | /      | /      |
+ |/       |/       |
+ +----------------------> time
+
+This gives the famous:
+
+Sawtooth pattern
+
+because:
+
+Linear increase
+      ↓
+Loss
+      ↓
+Decrease
+      ↓
+Linear increase
+      ↓
+Loss
+20. Important Algorithm Summary
+Slow Start
+Exponential increase
+Congestion Avoidance
+Linear increase
+AIMD
+Additive Increase
+Multiplicative Decrease
+Fast Retransmit
+3 duplicate ACKs
+→ retransmit without waiting for timeout
+Fast Recovery
+Reduce cwnd but don't necessarily go back to 1 MSS
+21. Tahoe vs Reno — One-Line Memory Trick
+TAHOE
+3 Dup ACK → Go back to 1 MSS
+
+RENO
+3 Dup ACK → Cut roughly in half + Fast Recovery
+
+But:
+
+Both:
+Timeout → cwnd = 1 MSS
+🔥 Placement Must-Remember
+cwnd  → protects network
+rwnd  → protects receiver
+
+Effective Window = min(cwnd, rwnd)
+Slow Start
+→ exponential growth
+Congestion Avoidance
+→ linear growth
+AIMD
+→ additive increase
+→ multiplicative decrease
+3 Duplicate ACKs
+→ Fast Retransmit
+Timeout
+→ cwnd → 1 MSS
+→ Slow Start
+Tahoe:
+3 dup ACK → cwnd = 1 MSS
+
+Reno:
+3 dup ACK → cwnd ≈ half
+          → Fast Recovery
+One classic interview question
+
+Q: Why does TCP reduce its sending rate when packet loss occurs?
+
+Because packet loss can indicate network congestion. TCP therefore reduces its congestion window to reduce the amount of traffic injected into the network.
+
+
+10. TCP CONNECTION TERMINATION — 4-WAY HANDSHAKE, FIN, ACK, TIME_WAIT & RST
+
+Now we finish the major TCP lifecycle: connection establishment → data transfer → connection termination.
+
+1. Why does TCP need termination?
+
+TCP is a full-duplex connection.
+
+That means:
+
+Client  →→→  Server
+Client  ←←←  Server
+
+Each direction can be closed independently.
+
+Therefore, TCP normally uses a 4-step termination.
+
+2. TCP 4-Way Handshake
+
+Basic flow:
+
+Client                         Server
+
+   FIN  ---------------------->
+
+        <---------------------- ACK
+
+        <---------------------- FIN
+
+   ACK  ---------------------->
+
+So:
+
+1. FIN
+2. ACK
+3. FIN
+4. ACK
+3. Why 4 Steps Instead of 3?
+
+Because TCP is full-duplex.
+
+The client may say:
+
+"I'm finished sending."
+
+But the server might still have data to send.
+
+So the server can:
+
+ACK client's FIN
+      ↓
+continue sending data
+      ↓
+send its own FIN later
+
+That's why the two directions are closed separately.
+
+4. Step-by-Step
+
+Suppose Client wants to close.
+
+Step 1 — Client sends FIN
+Client → Server
+
+FIN = 1
+Seq = x
+
+Meaning:
+
+"I have no more data to send."
+
+Step 2 — Server sends ACK
+Server → Client
+
+ACK = x + 1
+
+Meaning:
+
+"I received your FIN."
+
+But the server may still send data.
+
+Step 3 — Server sends FIN
+
+Once server finishes its data:
+
+Server → Client
+
+FIN = 1
+Seq = y
+
+Meaning:
+
+"I'm also finished sending."
+
+Step 4 — Client sends ACK
+Client → Server
+
+ACK = y + 1
+
+Connection is now closed from the protocol's perspective.
+
+5. FIN Consumes One Sequence Number
+
+Just like SYN:
+
+SYN → consumes 1 sequence number
+FIN → consumes 1 sequence number
+
+Example:
+
+FIN Seq = 5000
+
+Receiver responds:
+
+ACK = 5001
+6. TIME_WAIT
+
+This is one of the most commonly asked TCP termination questions.
+
+After sending the final ACK, the client doesn't immediately forget everything.
+
+It enters:
+
+TIME_WAIT
+
+Traditionally, this lasts about:
+
+2 × Maximum Segment Lifetime (2MSL)
+
+The exact duration is implementation-dependent.
+
+7. Why TIME_WAIT?
+
+There are two major reasons.
+
+Reason 1 — Handle delayed packets
+
+Imagine an old packet from the previous connection is still somewhere in the network.
+
+Old packet
+   ↓
+arrives late
+
+TIME_WAIT helps ensure enough time passes so delayed segments from the old connection don't interfere with a new connection using the same connection identifiers.
+
+Reason 2 — Ensure final ACK can be retransmitted
+
+Suppose:
+
+Client → final ACK → Server
+
+But the ACK gets lost.
+
+Server may retransmit its FIN.
+
+If the client is still in TIME_WAIT, it can send the ACK again.
+
+So:
+
+TIME_WAIT
+→ protects against delayed old segments
+→ allows retransmission of final ACK
+8. Who enters TIME_WAIT?
+
+In the usual active-close case, the endpoint that sends the final ACK enters TIME_WAIT.
+
+Typically:
+
+Client
+  ↓
+FIN
+  ↓
+...
+  ↓
+Final ACK
+  ↓
+TIME_WAIT
+
+Don't memorize "client always enters TIME_WAIT."
+
+It depends on who performs the active close.
+
+9. FIN vs RST
+
+Very important distinction.
+
+FIN
+
+Means:
+
+"I want to close the connection gracefully."
+
+It allows remaining data to be processed.
+
+FIN → graceful termination
+RST
+
+Means:
+
+"Immediately reset/abort this connection."
+
+RST → abrupt termination
+
+Examples where RST may occur:
+
+Connection to a nonexistent/unexpected port
+Serious protocol error
+Application forcibly aborts connection
+10. FIN vs RST
+FIN	RST
+Graceful close	Abrupt reset
+Normal termination	Error/forced termination
+Allows orderly shutdown	Immediately terminates
+Part of 4-way termination	Not part of normal 4-way handshake
+11. TCP Connection Lifecycle
+
+Put this in your notes:
+
+              TCP Connection
+                    |
+          ┌─────────┴─────────┐
+          ↓                   ↓
+     Establishment        Termination
+          |                   |
+          ↓                   ↓
+    3-way handshake      4-way handshake
+          |                   |
+          ↓                   ↓
+     SYN/SYN-ACK/ACK     FIN/ACK/FIN/ACK
+12. TCP State Flow
+
+Simplified client-side lifecycle:
+
+CLOSED
+   |
+   | SYN
+   ↓
+SYN-SENT
+   |
+   | SYN-ACK received
+   ↓
+ESTABLISHED
+   |
+   | FIN
+   ↓
+FIN-WAIT-1
+   |
+   ↓
+FIN-WAIT-2
+   |
+   ↓
+TIME-WAIT
+   |
+   ↓
+CLOSED
+
+Server side commonly starts:
+
+LISTEN
+   |
+   | SYN
+   ↓
+SYN-RECEIVED
+   |
+   | ACK
+   ↓
+ESTABLISHED
+
+You don't need to memorize every TCP state for placements, but these are useful.
+
+13. Why can a server still send data after receiving FIN?
+
+Because FIN means:
+
+"I have finished sending."
+
+It does not mean:
+
+"I will never receive/send anything again in both directions immediately."
+
+TCP supports half-close.
+
+Example:
+
+Client → FIN
+
+Client says:
+
+"I'm done sending."
+
+But:
+
+Server → DATA
+
+can still happen until the server sends its FIN.
+
+This is possible because TCP is full-duplex.
+
+🔥 Placement Must-Remember
+TCP connection establishment
+→ 3-way
+→ SYN
+→ SYN-ACK
+→ ACK
+TCP normal termination
+→ 4-way
+→ FIN
+→ ACK
+→ FIN
+→ ACK
+SYN → consumes 1 sequence number
+FIN → consumes 1 sequence number
+FIN → graceful close
+RST → abrupt reset
+TIME_WAIT
+→ handles delayed old segments
+→ allows retransmission of final ACK
+→ traditionally 2MSL
+TCP is full-duplex
+→ each direction closes independently
+🧠 TCP COMPLETE REVISION MAP
+
+You now have the entire core TCP mechanism:
+
+                 TCP
+                  |
+        ┌─────────┴─────────┐
+        ↓                   ↓
+   Establishment        Termination
+        |                   |
+   3-way handshake      4-way handshake
+        |                   |
+      SYN                 FIN
+      SYN-ACK             ACK
+      ACK                 FIN
+                          ACK
+        |
+        ↓
+   Data Transfer
+        |
+   ┌────┼──────────────┐
+   ↓    ↓              ↓
+Seq   ACKs         Sliding Window
+   |                   |
+   ↓                   ↓
+Reliability       Flow Control
+                       |
+                      rwnd
+                       |
+              Congestion Control
+                       |
+                      cwnd
+                       |
+       ┌───────────────┼──────────────┐
+       ↓               ↓              ↓
+  Slow Start      AIMD/CA       Fast Retransmit
+       |                              |
+       ↓                              ↓
+    Tahoe                          Reno
+
+That's the core TCP picture you should have in your head for interviews.
+
+11. APPLICATION LAYER — DNS, DHCP, HTTP/HTTPS & CORE INTERNET PROTOCOLS
+
+Now we move to the Application Layer, where the protocols that applications actually use live.
+
+The most important ones for placements are:
+
+DNS
+HTTP / HTTPS
+DHCP
+FTP
+SMTP
+SSH
+
+We'll start with DNS + DHCP, because they explain how a device gets an address and finds a server.
+
+1. DNS — Domain Name System
+
+Humans prefer:
+
+google.com
+
+Computers communicate using:
+
+142.x.x.x
+
+DNS maps:
+
+Domain Name → IP Address
+
+Example:
+
+google.com
+    ↓
+IP address
+
+Think of DNS as the Internet's distributed phonebook.
+
+2. Why DNS is Needed
+
+Without DNS, you'd have to remember:
+
+142.250.x.x
+
+instead of:
+
+google.com
+
+DNS provides name resolution.
+
+3. DNS Uses UDP and TCP
+
+DNS commonly uses:
+
+UDP → Port 53
+
+But DNS can also use:
+
+TCP → Port 53
+
+Don't memorize:
+
+DNS = UDP only ❌
+
+Better:
+
+DNS commonly uses UDP for normal queries, while TCP is also used in cases such as zone transfers and responses that require TCP.
+
+Modern DNS also has other transport mechanisms, but for placements:
+
+DNS → 53
+UDP commonly
+TCP also possible
+
+is enough.
+
+4. What Happens When You Enter google.com?
+
+This is one of the highest-value interview questions.
+
+Suppose you type:
+
+https://google.com
+
+Your computer needs Google's IP.
+
+It first checks local caches.
+
+Conceptually:
+
+Browser cache
+     ↓
+OS DNS cache
+     ↓
+DNS resolver/cache
+     ↓
+Root DNS server
+     ↓
+.com TLD server
+     ↓
+Authoritative DNS server
+     ↓
+Google's IP
+
+Let's understand this.
+
+5. DNS Hierarchy
+
+DNS is hierarchical.
+
+                    Root
+                     |
+          ┌──────────┼──────────┐
+         .com       .org       .in
+          |
+       google
+          |
+    authoritative
+       server
+
+The major components:
+
+Root DNS servers
+
+Know where to find TLD servers.
+
+Example:
+
+.com
+.org
+.in
+TLD servers
+
+TLD = Top-Level Domain
+
+Examples:
+
+.com
+.org
+.in
+.edu
+
+A .com TLD server helps direct queries toward the authoritative server for the requested domain.
+
+Authoritative DNS server
+
+Contains authoritative DNS information for the domain.
+
+Example:
+
+google.com → IP
+6. Recursive DNS Resolver
+
+Usually your device doesn't directly query the entire hierarchy itself.
+
+It asks a recursive resolver.
+
+Example:
+
+Your PC
+   ↓
+DNS Resolver
+   ↓
+Root
+   ↓
+TLD
+   ↓
+Authoritative
+
+The resolver does the work and returns the answer.
+
+It also caches answers.
+
+7. DNS Caching
+
+Suppose you previously accessed:
+
+google.com
+
+The IP may already be cached.
+
+Then:
+
+google.com
+     ↓
+Cache hit
+     ↓
+IP returned
+
+No need to perform the entire DNS lookup again.
+
+DNS records have a:
+
+TTL (Time To Live)
+
+which controls how long a cached result can be retained.
+
+Don't confuse this with IP packet TTL.
+
+Both use the word TTL but mean different things.
+
+8. DNS Record Types
+
+Important for placements:
+
+A
+A → IPv4 address
+
+Example:
+
+google.com → 142.x.x.x
+AAAA
+AAAA → IPv6 address
+CNAME
+CNAME → alias to another domain name
+MX
+MX → mail server
+NS
+NS → authoritative name server
+TXT
+
+Used for text-based information such as domain verification and email-related policies.
+
+9. DNS Resolution Example
+
+Suppose:
+
+www.example.com
+
+Resolver needs to find its IP.
+
+Conceptually:
+
+Root
+ ↓
+.com TLD
+ ↓
+example.com authoritative server
+ ↓
+www.example.com → IP
+
+Then resolver returns:
+
+IP → Your computer
+10. Recursive vs Iterative Query
+
+Important distinction.
+
+Recursive
+
+Client asks resolver:
+
+"Give me the final answer."
+
+Resolver does the work.
+
+Client → Resolver
+         ↓
+       Root
+         ↓
+        TLD
+         ↓
+   Authoritative
+         ↓
+       Answer
+Iterative
+
+Server responds with the best information it has, such as:
+
+"I don't know the final answer, but ask this server."
+
+The resolver then continues the process.
+
+11. DHCP
+
+Dynamic Host Configuration Protocol
+
+DHCP automatically provides network configuration to a device.
+
+Typically:
+
+IP address
+Subnet mask
+Default gateway
+DNS server
+
+Without DHCP, you'd have to configure these manually.
+
+12. DHCP Uses UDP
+
+DHCP uses:
+
+UDP
+
+Ports:
+
+Server → 67
+Client → 68
+
+Remember:
+
+DHCP → UDP 67/68
+13. DHCP DORA
+
+This is a classic interview/MCQ question.
+
+The four steps are:
+
+D → Discover
+O → Offer
+R → Request
+A → Acknowledgement
+Step 1 — Discover
+
+Client doesn't yet know its IP.
+
+It broadcasts:
+
+DHCP Discover
+Step 2 — Offer
+
+DHCP server responds:
+
+DHCP Offer
+
+Example:
+
+IP = 192.168.1.20
+Step 3 — Request
+
+Client says:
+
+"I want this offered address."
+
+DHCP Request
+Step 4 — ACK
+
+Server confirms:
+
+DHCP ACK
+
+Now client can use the configuration.
+
+14. Why does DHCP use Broadcast initially?
+
+At the beginning, the client may not have:
+
+IP address
+
+and may not know:
+
+DHCP server's IP
+
+So it needs a way to discover the server.
+
+Hence the initial DHCP process uses broadcast communication on the local network.
+
+15. DHCP DORA Diagram
+
+Put this in your notes:
+
+Client                         DHCP Server
+
+   DHCP DISCOVER  ------------>
+
+                   <---------- DHCP OFFER
+
+   DHCP REQUEST   ------------>
+
+                   <---------- DHCP ACK
+
+Memory:
+
+D → O → R → A
+16. DNS vs DHCP
+
+Very common confusion.
+
+DNS	DHCP
+Resolves names	Configures hosts
+Domain → IP	Assigns IP/configuration
+Port 53	UDP 67/68
+Name resolution	Network configuration
+
+Simple memory:
+
+DHCP → "What network configuration should I use?"
+
+DNS → "What IP belongs to this domain?"
+17. HTTP
+
+HyperText Transfer Protocol
+
+Used for communication between:
+
+Client ↔ Web Server
+
+Default port:
+
+80
+
+Example:
+
+Browser
+   ↓
+HTTP Request
+   ↓
+Web Server
+   ↓
+HTTP Response
+18. HTTPS
+
+HTTPS is essentially:
+
+HTTP + TLS
+
+Default port:
+
+443
+
+TLS provides security properties such as:
+
+Encryption
+Integrity
+Server authentication
+
+So:
+
+HTTP  → typically port 80
+HTTPS → typically port 443
+
+We'll do the TLS handshake and HTTPS security separately.
+
+19. HTTP Request/Response
+
+Example:
+
+GET /index.html HTTP/1.1
+Host: example.com
+
+Server responds:
+
+HTTP/1.1 200 OK
+Content-Type: text/html
+
+Common HTTP methods:
+
+GET
+POST
+PUT
+PATCH
+DELETE
+
+Common status codes:
+
+2xx → Success
+3xx → Redirection
+4xx → Client-side error
+5xx → Server-side error
+
+Important examples:
+
+200 → OK
+201 → Created
+301/302 → Redirect
+400 → Bad Request
+401 → Unauthorized
+403 → Forbidden
+404 → Not Found
+500 → Internal Server Error
+20. FTP
+
+File Transfer Protocol
+
+Common ports:
+
+21 → control
+20 → data (traditional active mode)
+
+You don't need deep FTP details for most placements.
+
+Remember:
+
+FTP → File transfer
+21. SSH
+
+Secure Shell
+
+Used for secure remote access.
+
+Port:
+
+22
+
+Example:
+
+Your PC
+   ↓ SSH
+Remote Server
+
+SSH encrypts the communication.
+
+22. SMTP
+
+Simple Mail Transfer Protocol
+
+Used for sending email.
+
+Commonly associated with:
+
+25
+587
+465
+
+For placement basics:
+
+SMTP → Sending email
+
+Receiving mail commonly involves:
+
+POP3
+IMAP
+🔥 Placement Must-Remember
+DNS
+→ Domain → IP
+→ Port 53
+→ UDP commonly, TCP also possible
+DNS records:
+
+A     → IPv4
+AAAA  → IPv6
+CNAME → Alias
+MX    → Mail server
+NS    → Name server
+TXT   → Text/policy information
+DNS hierarchy:
+
+Root
+ ↓
+TLD
+ ↓
+Authoritative DNS
+DHCP
+→ Automatically configures host
+→ UDP 67/68
+→ DORA
+
+Discover
+Offer
+Request
+ACK
+HTTP  → 80
+HTTPS → 443
+SSH   → 22
+DNS   → 53
+HTTP status:
+
+2xx → success
+3xx → redirect
+4xx → client error
+5xx → server error
+🔥 The Big "Type a URL" Chain
+
+Keep this in your notes because we'll keep adding to it:
+
+User types:
+https://google.com
+        ↓
+DNS resolution
+        ↓
+Google IP obtained
+        ↓
+ARP → Default Gateway MAC
+        ↓
+TCP 3-way handshake
+        ↓
+TLS handshake
+        ↓
+HTTP request
+        ↓
+Router forwarding
+        ↓
+Google server
+        ↓
+HTTP response
+        ↓
+Browser renders page
+
+We've now covered almost every component in that chain except TLS/HTTPS, and we'll come back to the complete flow at the end.
+
+12. APPLICATION LAYER — HTTP/HTTPS, COOKIES, SESSIONS & WEB COMMUNICATION
+
+Now let's go deeper into HTTP because placement interviews often ask beyond just GET/POST and status codes.
+
+1. HTTP Request-Response Model
+
+HTTP follows:
+
+Client → Request → Server
+Client ← Response ← Server
+
+Example:
+
+GET /users/10 HTTP/1.1
+Host: example.com
+
+Server:
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"id":10,"name":"Prince"}
+2. HTTP Request Structure
+
+A request contains:
+
+Request Line
+Headers
+Blank Line
+Body (optional)
+
+Example:
+
+POST /login HTTP/1.1
+Host: example.com
+Content-Type: application/json
+
+{"username":"abc","password":"xyz"}
+Request line
+POST /login HTTP/1.1
+
+contains:
+
+Method
+Path
+HTTP Version
+3. HTTP Response Structure
+Status Line
+Headers
+Blank Line
+Body
+
+Example:
+
+HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 1024
+
+<html>...</html>
+4. HTTP Methods
+GET
+
+Used to retrieve data.
+
+GET /users
+
+Usually:
+
+No request body required.
+
+GET is generally considered safe and idempotent.
+
+POST
+
+Used to submit/create/process data.
+
+POST /users
+
+Example:
+
+{
+  "name": "Prince"
+}
+
+POST is generally not idempotent.
+
+PUT
+
+Used to replace a resource.
+
+PUT /users/10
+
+If you send the same PUT request multiple times, the final resource state should generally be the same.
+
+So PUT is idempotent.
+
+PATCH
+
+Used for partial modification.
+
+PATCH /users/10
+
+Example:
+
+{
+  "name": "Rahul"
+}
+DELETE
+
+Deletes a resource.
+
+DELETE /users/10
+
+Generally considered idempotent.
+
+5. GET vs POST
+
+Very common interview question.
+
+GET	POST
+Retrieve data	Submit/process data
+Parameters often in URL	Data commonly in body
+Generally safe	Not generally safe
+Generally idempotent	Not generally idempotent
+Can be cached	Usually not treated the same way
+Bookmarkable	Generally not used as a bookmarkable resource
+Important:
+
+Don't say:
+
+POST is secure and GET is insecure.
+
+That's incorrect.
+
+HTTPS/TLS provides encryption, not the choice of GET vs POST.
+
+6. HTTP Status Codes
+
+Remember the categories:
+
+1xx → Informational
+2xx → Success
+3xx → Redirection
+4xx → Client error
+5xx → Server error
+
+Important:
+
+200 → OK
+201 → Created
+204 → No Content
+
+301 → Permanent Redirect
+302 → Temporary Redirect
+
+400 → Bad Request
+401 → Unauthorized
+403 → Forbidden
+404 → Not Found
+
+500 → Internal Server Error
+502 → Bad Gateway
+503 → Service Unavailable
+504 → Gateway Timeout
+401 vs 403
+
+Very common.
+
+401:
+
+Authentication is required/failed.
+
+403:
+
+Server understood the request but refuses to authorize it.
+
+Simple memory:
+
+401 → "Who are you?"
+403 → "I know who you are, but you can't do this."
+7. HTTP is Stateless
+
+This is extremely important.
+
+HTTP itself doesn't inherently remember previous requests.
+
+Example:
+
+Request 1 → Server
+Request 2 → Server
+Request 3 → Server
+
+Each request is conceptually independent.
+
+But websites need to maintain things like:
+
+Login
+Shopping cart
+User preferences
+
+So we use mechanisms such as:
+
+Cookies
+Sessions
+Tokens
+8. Cookies
+
+A cookie is small data stored by the browser and associated with a website/domain.
+
+Server can send:
+
+Set-Cookie: sessionId=abc123
+
+Browser stores it.
+
+Later:
+
+Cookie: sessionId=abc123
+
+Browser sends it back to the relevant server.
+
+9. Why Cookies?
+
+Common uses:
+
+Session tracking
+Authentication state
+Preferences
+Shopping carts
+Analytics
+10. Session-Based Authentication
+
+Typical flow:
+
+Login
+  ↓
+Server verifies credentials
+  ↓
+Creates session
+  ↓
+Session ID
+  ↓
+Cookie stored in browser
+
+Later:
+
+Browser
+   ↓
+Cookie: sessionId=abc
+   ↓
+Server
+   ↓
+Find session
+   ↓
+Identify user
+
+Important:
+
+The cookie may contain only a session identifier; the actual session data can be stored server-side.
+
+11. Cookies vs Sessions
+
+Don't confuse them.
+
+Cookie
+
+Stored mainly on:
+
+Client/browser
+Session
+
+Usually represents server-side state associated with a client.
+
+Browser
+   ↓
+Session ID cookie
+   ↓
+Server
+   ↓
+Session data
+12. JWT
+
+Another common authentication approach.
+
+JWT:
+
+JSON Web Token
+
+Conceptually:
+
+Header.Payload.Signature
+
+The client can send it with requests:
+
+Authorization: Bearer <token>
+
+Unlike traditional server-side sessions, JWT-based authentication is often designed so the server can validate information in the token without storing a session for every client.
+
+But JWT itself is not encryption by default; it is typically signed.
+
+13. HTTP Keep-Alive
+
+Creating a new TCP connection for every request is inefficient.
+
+Instead, HTTP can reuse a TCP connection for multiple requests.
+
+TCP connection
+      |
+      ├── Request 1
+      ├── Response 1
+      ├── Request 2
+      ├── Response 2
+      └── Request 3
+
+This reduces repeated connection-establishment overhead.
+
+14. HTTP/1.0 vs HTTP/1.1
+HTTP/1.0
+
+Historically, connections were commonly closed after a response unless persistence was requested.
+
+HTTP/1.1
+
+Persistent connections became the default behavior.
+
+So:
+
+HTTP/1.1
+→ persistent connections
+→ Host header
+→ chunked transfer encoding
+15. HTTP/2
+
+HTTP/2 introduced important improvements.
+
+Binary framing
+
+HTTP/2 uses binary frames rather than HTTP/1.x's textual message framing.
+
+Multiplexing
+
+Multiple requests/responses can share one TCP connection.
+
+One TCP connection
+       |
+   ┌───┼────┐
+   ↓   ↓    ↓
+Req1 Req2  Req3
+
+This reduces the need for multiple parallel TCP connections.
+
+Header compression
+
+HTTP/2 uses HPACK for header compression.
+
+For placements:
+
+HTTP/1.1 → persistent connections
+HTTP/2   → multiplexing + binary framing + HPACK
+16. HTTP/3
+
+This is worth knowing at a high level.
+
+HTTP/3 uses:
+
+HTTP/3
+   ↓
+QUIC
+   ↓
+UDP
+
+Instead of:
+
+HTTP/1.1 or HTTP/2
+        ↓
+       TCP
+
+QUIC provides transport features such as:
+
+Reliability
+Encryption
+Stream multiplexing
+Faster connection establishment
+
+So don't say:
+
+HTTP/3 is unreliable because it uses UDP.
+
+QUIC adds reliability and other transport functionality above UDP.
+
+17. HTTP Version Comparison
+	HTTP/1.1	HTTP/2	HTTP/3
+Transport	TCP	TCP	QUIC/UDP
+Multiplexing	Limited	Yes	Yes
+Binary framing	No	Yes	Yes
+Header compression	—	HPACK	QPACK
+Main idea	Persistent connections	Multiplexing	QUIC-based transport
+
+You don't need deep HTTP/3 details unless the company asks modern web architecture.
+
+18. HTTPS
+
+HTTPS means:
+
+HTTP
+ +
+TLS
+
+TLS provides:
+
+Encryption
+Integrity
+Authentication
+
+Basic flow:
+
+TCP connection
+      ↓
+TLS handshake
+      ↓
+Secure channel
+      ↓
+HTTP communication
+
+We'll cover the TLS handshake separately.
+
+19. 🔥 HTTP vs HTTPS
+HTTP	HTTPS
+Plain HTTP	HTTP over TLS
+Typically port 80	Typically port 443
+No TLS encryption	Encrypted with TLS
+No TLS server authentication	TLS can authenticate server
+
+Important:
+
+HTTPS doesn't change HTTP's basic request/response model. It secures the communication channel using TLS.
+
+20. Cookies + HTTPS Security
+
+Cookies can have security attributes.
+
+Important ones:
+
+Secure
+
+Cookie should only be sent over HTTPS.
+
+HttpOnly
+
+JavaScript can't directly access the cookie through document.cookie.
+
+Helps reduce some cookie theft through XSS.
+
+SameSite
+
+Controls when cookies are sent in cross-site contexts and helps mitigate some CSRF scenarios.
+
+For placements, know the names and basic purpose.
+
+🔥 Placement Must-Remember
+HTTP
+→ Request / Response
+→ Stateless
+→ Port 80
+
+HTTPS
+→ HTTP + TLS
+→ Port 443
+GET    → retrieve
+POST   → submit/create/process
+PUT    → replace
+PATCH  → partial update
+DELETE → delete
+401 → Authentication problem
+403 → Not authorized
+404 → Resource not found
+500 → Server error
+Cookie
+→ client-side storage
+
+Session
+→ server-side state associated with client
+HTTP/1.1 → persistent connections
+HTTP/2   → multiplexing + binary framing
+HTTP/3   → QUIC over UDP
+
+And this is a very useful interview flow:
+
+Browser
+ ↓
+DNS
+ ↓
+TCP
+ ↓
+TLS
+ ↓
+HTTP
+ ↓
+Server
+
+13. HTTPS & TLS — ENCRYPTION, CERTIFICATES, PUBLIC/PRIVATE KEYS & TLS HANDSHAKE
+
+This is a high-value interview topic because it connects HTTP + cryptography + networking + security.
+
+The main question is:
+
+How does HTTPS securely communicate with a server?
+
+1. HTTP vs HTTPS
+
+HTTP:
+
+Browser ─────── HTTP ───────> Server
+
+The communication isn't protected by TLS.
+
+HTTPS:
+
+Browser ─────── TLS ───────> Server
+                 ↓
+               HTTP
+
+So:
+
+HTTPS = HTTP + TLS
+
+TLS provides:
+
+Confidentiality → others can't easily read data
+Integrity       → data wasn't modified undetected
+Authentication  → client can verify the server identity
+2. Symmetric vs Asymmetric Encryption
+
+Before understanding TLS, understand these two.
+
+Symmetric Encryption
+
+Same secret key is used for encryption and decryption.
+
+             Same Key
+                ↓
+Plaintext → Encryption → Ciphertext
+                         ↓
+                    Decryption
+                         ↓
+                     Plaintext
+
+Examples:
+
+AES
+ChaCha20
+Advantage
+
+Very fast.
+
+Problem
+
+How do both sides securely obtain the same secret key?
+
+That's where asymmetric cryptography helps.
+
+3. Asymmetric Encryption
+
+Uses a key pair:
+
+Public Key
+Private Key
+
+The public key can be shared.
+
+The private key must remain secret.
+
+Conceptually:
+
+Public Key  → shared
+Private Key → secret
+
+Examples:
+
+RSA
+ECC
+4. What is the basic idea?
+
+Suppose server has:
+
+Public Key  = PUB
+Private Key = PRIV
+
+Client can obtain the server's public key.
+
+The private key remains with the server.
+
+But modern TLS generally uses asymmetric cryptography primarily for authentication and key establishment, then uses fast symmetric encryption for actual application data.
+
+That's important.
+
+HTTPS does NOT normally encrypt all your web data using RSA/public-key encryption.
+
+5. Why use Symmetric Encryption for Data?
+
+Because asymmetric cryptography is computationally more expensive.
+
+So TLS generally does:
+
+Asymmetric cryptography
+        ↓
+Securely establish/authenticate keys
+        ↓
+Symmetric session keys
+        ↓
+Encrypt actual HTTP data
+
+This is a classic interview concept.
+
+6. Digital Certificate
+
+How does your browser know:
+
+"This public key actually belongs to google.com?"
+
+The server presents a digital certificate.
+
+Certificate contains information such as:
+
+Domain identity
+Public key
+Validity period
+Certificate issuer
+Digital signature
+
+The certificate is signed by a trusted Certificate Authority (CA).
+
+7. Certificate Authority
+
+A CA is a trusted entity that issues/signs certificates.
+
+Conceptually:
+
+Google
+  ↓
+Certificate
+  ↓
+Signed by CA
+  ↓
+Browser verifies CA trust
+
+Browsers/operating systems maintain trusted CA certificates.
+
+So the browser can verify:
+
+"This certificate was signed by a CA I trust."
+
+8. Certificate Chain
+
+Certificates commonly form a chain:
+
+Root CA
+   ↓
+Intermediate CA
+   ↓
+Server Certificate
+   ↓
+google.com
+
+The browser validates this chain.
+
+9. TLS Handshake — Big Picture
+
+Simplified:
+
+Client                         Server
+
+ClientHello  ---------------->
+
+              <--------------- ServerHello
+              <--------------- Certificate
+              <--------------- Key exchange info
+
+Key exchange  <------------->
+
+Secure keys established
+
+Encrypted HTTP communication
+<===========================>
+
+Modern TLS versions, especially TLS 1.3, have a more specific handshake and don't map exactly to older TLS versions.
+
+For placement interviews, understand the purpose rather than memorizing obsolete packet sequences.
+
+10. TLS 1.3 — High-Level Flow
+
+Conceptually:
+
+Client
+  |
+  | ClientHello + key share
+  ↓
+Server
+  |
+  | ServerHello + key share
+  | Certificate
+  | Authentication
+  ↓
+Both derive shared secret
+  ↓
+Encrypted communication
+
+The important idea:
+
+Both sides securely derive shared symmetric keys.
+
+11. Diffie-Hellman Key Exchange
+
+A common mechanism for establishing a shared secret.
+
+The key idea:
+
+Client has secret A
+Server has secret B
+
+        ↓
+
+Exchange public information
+
+        ↓
+
+Both independently derive:
+
+      SAME shared secret
+
+An attacker observing the exchanged public information should not be able to easily derive the secret.
+
+Modern TLS commonly uses ephemeral Diffie-Hellman, such as ECDHE.
+
+12. Why "Ephemeral" Matters
+
+ECDHE =
+
+Elliptic Curve Diffie-Hellman Ephemeral
+
+Ephemeral keys are newly generated for sessions.
+
+This provides:
+
+Forward secrecy
+
+If the server's long-term private key is compromised later, previously captured sessions should still remain protected under the intended security assumptions because their ephemeral session keys aren't derived from that long-term key.
+
+This is a nice advanced interview point.
+
+13. Authentication vs Encryption
+
+Very important distinction.
+
+Certificate
+
+Primarily helps with:
+
+Authentication
+
+It lets the client verify the server's identity/public key through the certificate chain.
+
+Session Key
+
+Used for:
+
+Symmetric encryption
+
+of the actual communication.
+
+So:
+
+Certificate → "Who am I talking to?"
+Session key → "How do we securely communicate?"
+14. What if an Attacker Intercepts the Connection?
+
+Suppose:
+
+Client
+  |
+Attacker
+  |
+Server
+
+If HTTPS/TLS is correctly validated:
+
+The attacker shouldn't be able to simply replace the server's identity with their own without causing certificate/authentication validation to fail.
+
+This is one reason certificate validation matters.
+
+15. Man-in-the-Middle Attack
+
+MITM:
+
+Attacker places themselves between two communicating parties.
+
+Without authentication:
+
+Client ↔ Attacker ↔ Server
+
+Attacker may attempt to impersonate the server.
+
+TLS certificates and authentication help prevent this.
+
+16. Encryption vs Hashing
+
+Don't confuse these.
+
+Encryption
+
+Can be reversed with the appropriate key.
+
+Plaintext → Encryption → Ciphertext
+Hashing
+
+One-way transformation.
+
+Data → Hash → Digest
+
+Examples:
+
+SHA-256
+SHA-3
+
+Hashing is useful for integrity and many other purposes.
+
+17. Digital Signature
+
+A digital signature is used to provide:
+
+Authentication
+Integrity
+Non-repudiation in appropriate contexts
+
+Conceptually:
+
+Message
+   ↓
+Hash
+   ↓
+Sign using private key
+   ↓
+Digital Signature
+
+Receiver uses the corresponding public key to verify the signature.
+
+In TLS certificates, the CA's signature helps establish trust in the certificate.
+
+18. Public Key vs Private Key
+
+Remember:
+
+Public key
+→ Can be shared
+
+Private key
+→ Must remain secret
+
+If the private key is compromised, an attacker may be able to impersonate the associated identity depending on the protocol and key usage.
+
+19. HTTPS Complete Flow
+
+Now connect everything:
+
+User enters:
+
+https://example.com
+        ↓
+DNS
+        ↓
+Server IP obtained
+        ↓
+TCP 3-way handshake
+        ↓
+TLS handshake
+        ↓
+Certificate validation
+        ↓
+Key establishment
+        ↓
+Symmetric session keys
+        ↓
+Encrypted HTTP request
+        ↓
+Server
+        ↓
+Encrypted HTTP response
+        ↓
+Browser decrypts
+
+This is an excellent interview answer structure.
+
+🔥 Placement Must-Remember
+HTTPS = HTTP + TLS
+Symmetric
+→ same secret key
+→ fast
+→ AES, ChaCha20
+Asymmetric
+→ public + private key
+→ authentication/key establishment
+→ RSA, ECC
+Certificate
+→ binds identity/domain to public key
+→ signed by CA
+TLS
+→ confidentiality
+→ integrity
+→ authentication
+TLS 1.3
+→ modern TLS
+→ ephemeral key exchange commonly used
+→ forward secrecy
+HTTPS data
+→ symmetric encryption
+
+Public-key cryptography
+→ authentication/key establishment
+⭐ One interview trap
+
+Q: Does HTTPS encrypt data using the server's public key?
+
+A good answer:
+
+Not for the bulk application data. TLS uses public-key mechanisms for authentication and/or key establishment, then uses symmetric session keys because symmetric encryption is much more efficient.
+
+14. COMPLETE END-TO-END NETWORK FLOW — “WHAT HAPPENS WHEN YOU TYPE https://google.com?”
+
+This is one of the most important Computer Networks interview questions because it connects almost every concept we've revised.
+
+1. User enters the URL
+
+You type:
+
+https://google.com
+
+Browser needs to find the server and establish a secure connection.
+
+Overall flow:
+
+URL
+ ↓
+DNS
+ ↓
+IP address
+ ↓
+ARP → Gateway MAC
+ ↓
+TCP 3-way handshake
+ ↓
+TLS handshake
+ ↓
+HTTP request
+ ↓
+Routers forward packets
+ ↓
+Google server
+ ↓
+HTTP response
+ ↓
+Browser renders page
+2. DNS — Find the IP Address
+
+Browser/OS needs:
+
+google.com → IP address
+
+It checks possible caches first:
+
+Browser cache
+     ↓
+OS DNS cache
+     ↓
+DNS resolver cache
+     ↓
+DNS hierarchy
+
+If not cached, DNS resolution eventually reaches an authoritative DNS server.
+
+Example:
+
+google.com → 142.x.x.x
+
+The exact IP can vary.
+
+Important
+
+DNS:
+
+Domain name → IP address
+
+DNS commonly uses:
+
+UDP 53
+
+but TCP can also be used.
+
+3. Decide: Is the Destination Local or Remote?
+
+Suppose your computer has:
+
+IP = 192.168.1.10
+Subnet = 192.168.1.0/24
+
+and Google's IP is something completely different.
+
+Your computer determines:
+
+Google is outside my subnet
+        ↓
+Send packet to default gateway
+
+So your computer needs the MAC address of the router/default gateway, not Google's MAC address.
+
+4. ARP — Find Gateway MAC
+
+Suppose gateway is:
+
+192.168.1.1
+
+Your computer checks its ARP cache.
+
+If not present:
+
+ARP Request:
+"Who has 192.168.1.1?"
+
+This is broadcast on the local network.
+
+Router replies:
+
+192.168.1.1 is at AA:BB:CC:DD:EE:FF
+
+Now your computer knows the gateway's MAC.
+
+Very important interview point
+
+You do not ARP for Google's MAC address.
+
+You ARP for:
+
+Default Gateway's MAC
+
+because MAC addresses are only relevant to the current local link.
+
+5. TCP 3-Way Handshake
+
+Since HTTPS normally uses TCP for HTTP/1.1 and HTTP/2, TCP connection establishment happens before HTTP data transfer.
+
+Client                    Server
+
+   SYN  -------------------->
+       <---------------- SYN + ACK
+   ACK  -------------------->
+
+Example:
+
+Client: SYN, Seq = 100
+
+Server: SYN + ACK
+        Seq = 500
+        Ack = 101
+
+Client: ACK
+        Ack = 501
+
+Now:
+
+TCP connection established
+6. TLS Handshake
+
+Because URL is:
+
+https://
+
+we need TLS.
+
+High-level:
+
+Client → ClientHello
+Server → ServerHello + Certificate + key-exchange information
+Client/Server → establish shared session keys
+
+The browser verifies the server certificate.
+
+Certificate helps establish:
+
+"This public key belongs to google.com."
+
+Then both sides derive symmetric session keys.
+
+Why symmetric encryption for actual data?
+
+Because it is much faster for bulk data.
+
+So:
+
+Asymmetric cryptography
+        ↓
+Authentication + key establishment
+
+Symmetric cryptography
+        ↓
+Actual HTTP data
+7. HTTP Request
+
+Now browser can send the actual HTTP request.
+
+Conceptually:
+
+GET / HTTP/2
+Host: google.com
+
+The HTTP data is encrypted by TLS.
+
+So what travels through the network is roughly:
+
+Encrypted HTTP data
+        ↓
+TCP segment
+        ↓
+IP packet
+        ↓
+Ethernet frame
+8. Encapsulation
+
+This is a very common interview question.
+
+At sender:
+
+HTTP data
+   ↓
+TLS encrypted data
+   ↓
+TCP segment
+   ↓
+IP packet
+   ↓
+Ethernet frame
+   ↓
+Bits
+
+At receiver:
+
+Bits
+ ↓
+Ethernet frame
+ ↓
+IP packet
+ ↓
+TCP segment
+ ↓
+TLS
+ ↓
+HTTP
+
+This is encapsulation and decapsulation.
+
+9. Switch Forwards the Frame
+
+Your computer sends the Ethernet frame to the switch.
+
+Frame contains:
+
+Source MAC = Your computer
+Destination MAC = Router
+
+Switch checks its MAC table.
+
+It forwards the frame toward the router.
+
+Remember:
+
+Switch → MAC address
+Router → IP address
+10. Router Forwards the IP Packet
+
+Router receives the Ethernet frame.
+
+It removes the incoming link-layer header/trailer and examines the IP packet.
+
+It checks its routing table:
+
+Destination IP
+      ↓
+Longest Prefix Match
+      ↓
+Next Hop
+      ↓
+Outgoing Interface
+
+Then it creates a new link-layer frame for the next hop.
+
+Very important:
+
+At every router:
+
+MAC addresses → change
+IP source/destination → normally remain the same
+TTL → decreases
+
+Example:
+
+PC → Router A → Router B → Router C → Google
+
+MAC addresses are different on each link.
+
+11. NAT May Happen
+
+If you're using a private IP:
+
+192.168.1.10
+
+your home router may perform NAT.
+
+For example:
+
+192.168.1.10:5000
+        ↓ NAT
+Public_IP:30001
+
+The Internet generally sees the public address, not your private address.
+
+NAT keeps track of the mapping so replies can return to the correct internal device.
+
+12. Packet Reaches Google's Server
+
+Eventually:
+
+Internet
+   ↓
+Google network
+   ↓
+Load balancer / frontend infrastructure
+   ↓
+Appropriate server
+
+The server processes the request.
+
+It may need to retrieve data from other internal services/databases, depending on the request.
+
+13. Response Comes Back
+
+Server sends:
+
+HTTP Response
+
+For example:
+
+HTTP/2 200 OK
+
+The response is:
+
+HTTP
+ ↓
+TLS encryption
+ ↓
+TCP
+ ↓
+IP
+ ↓
+Link-layer frame
+
+It travels back through the network.
+
+TCP provides:
+
+ordering
+acknowledgements
+retransmission when needed
+flow control
+congestion control
+14. Browser Receives and Renders
+
+Eventually:
+
+Ethernet
+ ↓
+IP
+ ↓
+TCP
+ ↓
+TLS
+ ↓
+HTTP
+ ↓
+Browser
+
+Browser processes the response and renders the page.
+
+It may then make many additional requests for:
+
+HTML
+CSS
+JavaScript
+Images
+Fonts
+APIs
+
+Those requests can reuse connections depending on the protocol and browser/server behavior.
+
+⭐ COMPLETE INTERVIEW FLOW
+
+If interviewer asks:
+
+"What happens when you type https://google.com?"
+
+A good structured answer:
+
+1. Browser checks caches and performs DNS resolution.
+2. DNS gives the server IP address.
+3. Client checks whether destination is local; if remote,
+   it needs the default gateway's MAC using ARP.
+4. TCP 3-way handshake establishes the connection.
+5. TLS handshake authenticates the server and establishes
+   encryption keys.
+6. Browser sends an encrypted HTTP request.
+7. Data is encapsulated as TCP segment → IP packet → Ethernet frame.
+8. Switches forward using MAC addresses.
+9. Routers forward using IP addresses and routing tables.
+10. NAT may translate the private source IP to a public IP.
+11. Server processes the request and sends the response.
+12. TCP delivers it reliably, TLS decrypts it, and the browser
+    renders the response.
+🔥 Placement Traps
+Q1. Does the client find Google's MAC address?
+
+No.
+
+It finds the MAC of the next-hop router/default gateway.
+
+Q2. Does MAC address remain the same across the Internet?
+
+No.
+
+MAC changes at every Layer-2 hop.
+
+Q3. Does IP address change at every router?
+
+Normally no.
+
+Source/destination IP remain the same end-to-end, except things like NAT can modify them.
+
+Q4. Which device uses MAC addresses for forwarding?
+
+Switch.
+
+Q5. Which device uses IP addresses for routing?
+
+Router.
+
+Q6. Why TCP before TLS?
+
+For the traditional TLS-over-TCP setup used by HTTPS with HTTP/1.1 and HTTP/2, TCP provides the reliable transport first.
+
+HTTP/3 is different: it uses QUIC over UDP.
+
+🧠 ONE DIAGRAM TO REMEMBER
+              DNS
+               ↓
+       Find Server IP
+               ↓
+        Is it remote?
+               ↓
+       ARP Gateway MAC
+               ↓
+        TCP 3-Way Handshake
+               ↓
+          TLS Handshake
+               ↓
+        HTTP Request
+               ↓
+      ┌─────────────────┐
+      │ Ethernet Frame  │
+      │   IP Packet     │
+      │  TCP Segment    │
+      │  HTTP Data      │
+      └─────────────────┘
+               ↓
+            Switch
+               ↓
+            Router
+               ↓
+       Router → Router
+               ↓
+           Server
+               ↓
+        HTTP Response
+               ↓
+        TLS Decryption
+               ↓
+           Browser
+Placement Must-Remember
+
+DNS → name → IP
+
+ARP → IP → MAC on local link
+
+Switch → MAC
+
+Router → IP
+
+TCP → reliable transport
+
+TLS → security
+
+HTTP → application data
+
+NAT → private ↔ public address translation
+
+MAC changes hop-by-hop
+
+IP normally stays end-to-end
+
+TTL decreases at routers
+
+Encapsulation → Data → Segment → Packet → Frame → Bits
+
+This single flow ties together almost the entire CN revision so far.
+
+15. ERROR DETECTION & ERROR CORRECTION
+
+This is an important Data Link Layer topic for placements.
+
+1. Error Detection vs Error Correction
+
+When data travels through a network, bits can get corrupted:
+
+Sender:   10110101
+                ↓
+Receiver: 10100101
+Error Detection
+
+Receiver determines:
+
+"Something is wrong."
+
+But it may not know the correct data.
+
+Error Correction
+
+Receiver determines:
+
+"Something is wrong, and I can recover the correct data."
+
+2. Parity Bit
+
+Simplest error detection technique.
+
+We add one extra bit to make the number of 1s either:
+
+Even parity
+Odd parity
+
+Example:
+
+Data = 1011001
+
+Number of 1s = 4.
+
+For even parity:
+
+10110010
+       ↑
+    parity bit
+
+Total 1s = 4 → even.
+
+Problem
+
+Parity can detect a single-bit error, but if two bits change, parity may not detect it.
+
+3. Checksum
+
+Used in networking protocols.
+
+Basic idea:
+
+Data
+ ↓
+Divide into fixed-size words
+ ↓
+Add them
+ ↓
+Complement result
+ ↓
+Checksum
+
+Receiver performs the calculation again.
+
+If the result doesn't match:
+
+Error detected
+Important
+
+Checksum is mainly used for error detection, not correction.
+
+4. CRC — Cyclic Redundancy Check
+
+Very important for placements.
+
+CRC uses polynomial division.
+
+Sender:
+
+Data
+ ↓
+Append zeros
+ ↓
+Divide by generator polynomial
+ ↓
+Remainder = CRC
+ ↓
+Transmit Data + CRC
+
+Receiver:
+
+Received Data + CRC
+        ↓
+Divide by same generator
+        ↓
+Remainder = 0 → likely no error
+Remainder ≠ 0 → error
+Example concept
+
+If generator has degree r:
+
+Data = 101101
+Generator = 1101
+
+Generator degree = 3.
+
+Append 3 zeros:
+
+101101000
+
+Then perform XOR-based binary division.
+
+The final remainder is attached to the original data.
+
+Why CRC is popular?
+
+CRC is very good at detecting:
+
+single-bit errors
+many multiple-bit errors
+burst errors
+
+Ethernet uses FCS, which is based on CRC.
+
+5. Hamming Code — Error Correction
+
+Hamming code can detect and correct certain bit errors.
+
+For basic Hamming code:
+
+Can correct → 1-bit error
+Can detect → 2-bit errors under standard assumptions
+
+Parity bits are placed at positions:
+
+1, 2, 4, 8, 16...
+
+These are powers of 2.
+
+Example:
+
+Position:
+1 2 3 4 5 6 7
+P P D P D D D
+
+Parity bits check different groups of positions.
+
+At receiver, parity checks produce a syndrome.
+
+The syndrome tells us the position of the erroneous bit.
+
+Example:
+
+Syndrome = 101₂ = 5
+
+Therefore:
+
+Bit 5 is erroneous
+
+Flip bit 5 → corrected data.
+
+🔥 Detection vs Correction
+Technique	Main purpose
+Parity	Error detection
+Checksum	Error detection
+CRC	Strong error detection
+Hamming Code	Error correction
+Placement Must Remember
+
+Parity → simple detection
+
+Checksum → detection
+
+CRC → strong detection, polynomial/XOR division
+
+Hamming → correction using parity bits + syndrome
+
+Ethernet FCS → CRC-based error detection
+
+16. TUNNELING
+
+Tunneling means:
+
+Encapsulating one protocol's packet inside another protocol so it can travel through a network.
+
+Think:
+
+Original Packet
+      ↓
+Encapsulate inside another packet
+      ↓
+Travel through network
+      ↓
+Decapsulate
+      ↓
+Original Packet
+Example
+
+Suppose:
+
+Private network A
+      |
+      | Internet
+      |
+Private network B
+
+We can create a tunnel:
+
+Original IP packet
+       ↓
+[New outer IP header
+ Original IP packet]
+       ↓
+     Internet
+       ↓
+Remove outer header
+       ↓
+Original packet
+
+The intermediate Internet routers mainly deal with the outer packet.
+
+17. VPN — Virtual Private Network
+
+VPN uses tunneling plus security mechanisms to create a secure connection over an untrusted network such as the Internet.
+
+Conceptually:
+
+Your device
+    ↓
+VPN encryption/tunnel
+    ↓
+Internet
+    ↓
+VPN server
+    ↓
+Destination
+Why VPN?
+
+Common purposes:
+
+secure communication over public networks
+remote access to private company networks
+protecting traffic from local network observers
+connecting geographically separated private networks
+VPN Tunneling
+
+Without VPN:
+
+Your Device ───── Internet ───── Server
+
+With VPN:
+
+Your Device
+     ↓
+Encrypted VPN tunnel
+     ↓
+Internet
+     ↓
+VPN Server
+     ↓
+Destination
+
+The original packet is encapsulated inside another packet.
+
+18. VPN vs Tunneling
+
+Don't treat them as exactly the same.
+
+Tunneling
+
+A technique:
+
+Packet inside another packet
+VPN
+
+A networking service/architecture that commonly uses:
+
+Tunneling
++
+Authentication
++
+Encryption/integrity
+19. VPN Protocol Examples
+
+You may hear:
+
+IPsec
+OpenVPN
+WireGuard
+GRE
+
+Important distinction:
+
+GRE provides tunneling/encapsulation but by itself does not provide encryption.
+
+IPsec can provide authentication, integrity and encryption depending on the configuration.
+
+20. VPN Types
+Remote Access VPN
+
+Individual user connects to organization.
+
+Employee → Internet → Company Network
+Site-to-Site VPN
+
+Two networks are connected.
+
+Office A ←── VPN ──→ Office B
+21. WIRELESS NETWORKING
+
+Now the important Wi-Fi concepts.
+
+Wireless LAN is commonly based on:
+
+IEEE 802.11
+
+Wi-Fi operates primarily at:
+
+Physical Layer
+Data Link Layer
+22. Why Wi-Fi Uses CSMA/CA Instead of CSMA/CD?
+
+Ethernet historically used:
+
+CSMA/CD
+
+Wi-Fi uses:
+
+CSMA/CA
+
+Because detecting collisions while transmitting wirelessly is difficult.
+
+So Wi-Fi tries to avoid collisions rather than detect them after they happen.
+
+23. CSMA/CA Process
+
+Basic flow:
+
+Sense channel
+      ↓
+Is it busy?
+  ↓         ↓
+ YES       NO
+  ↓         ↓
+Wait     Random Backoff
+             ↓
+          Transmit
+             ↓
+           ACK?
+          /    \
+        Yes     No
+        ↓        ↓
+      Done    Backoff + Retry
+
+Random backoff is important because otherwise multiple waiting devices could transmit simultaneously.
+
+24. Hidden Terminal Problem
+
+Very important interview question.
+
+Suppose:
+
+A -----> B <----- C
+
+A and C cannot hear each other.
+
+But both can communicate with B.
+
+A thinks:
+
+"Channel is free."
+
+C also thinks:
+
+"Channel is free."
+
+Both transmit:
+
+A ───────→ B
+C ───────→ B
+
+       COLLISION
+
+This is the hidden terminal problem.
+
+25. RTS/CTS
+
+Wi-Fi can use:
+
+RTS = Request To Send
+CTS = Clear To Send
+
+Flow:
+
+Sender → RTS → Receiver
+Sender ← CTS ← Receiver
+Sender → DATA → Receiver
+Sender ← ACK ← Receiver
+
+Other devices hearing CTS know:
+
+Don't transmit now.
+
+This helps reduce the hidden terminal problem.
+
+26. Wi-Fi Access Point
+
+An Access Point (AP) connects wireless devices to a wired network.
+
+Example:
+
+Laptop ))))
+          \
+           AP ─── Switch ─── Router ─── Internet
+          /
+Phone ))))
+
+The AP provides wireless network access.
+
+27. Wi-Fi Infrastructure vs Ad Hoc
+Infrastructure Mode
+
+Devices communicate through an AP.
+
+Laptop ──┐
+Phone ───┼── AP
+Tablet ──┘
+Ad Hoc
+
+Devices communicate directly with each other without a central AP.
+
+🔥 Placement Must-Remember
+Error Detection
+Parity     → simple detection
+Checksum   → detection
+CRC        → strong detection
+Error Correction
+Hamming Code → corrects single-bit errors
+Tunneling
+Packet inside another packet
+VPN
+Secure private communication over public network
+Wireless
+Wi-Fi → IEEE 802.11
+Wi-Fi → CSMA/CA
+Ethernet → historically CSMA/CD
+Hidden terminal → RTS/CTS
+AP → connects wireless devices to network
+One-line interview answers
+
+Why CSMA/CA?
+Because collision detection is difficult in wireless networks, so Wi-Fi tries to avoid collisions.
+
+What is tunneling?
+Encapsulating one protocol packet inside another packet to carry it across a network.
+
+What is VPN?
+A secure logical connection over an untrusted network, commonly using tunneling plus encryption/authentication.
+
+What is CRC?
+An error-detection technique based on polynomial division using XOR operations.
+
+What is Hamming code?
+An error-correcting code that uses parity bits to identify and correct certain bit errors.

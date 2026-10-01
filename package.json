@@ -1,0 +1,25 @@
+{
+  "name": "packet-notes",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Packet Notes: Computer Networks revision website (placement / interview prep)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "content": "node scripts/convert-chapters.mjs",
+    "verify": "node scripts/verify-widgets.mjs",
+    "crosscheck": "node scripts/crosscheck.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "node-html-parser": "^6.1.13",
+    "vite": "^5.4.11"
+  }
+}
