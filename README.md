@@ -1,70 +1,86 @@
-# Packet Notes: Computer Networks revision
+# CN Prep: Computer Networks, one packet at a time
 
-A static React + Vite site for revising Computer Networks for placements and interviews:
-21 chapters, 51 interactive diagrams, a quick sheet per chapter, 212 flashcards, 146 quiz
-questions, a mixed Practice page, search, light/dark themes, and offline support.
+**Live site:** https://i-amprince.github.io/CN_PREP/
+
+## Why I built this
+
+While preparing for campus placements, Computer Networks was the subject I kept struggling with.
+My notes were spread across notebooks, PDFs, YouTube comments and random blog posts. Every time
+an interviewer-style question came up ("What happens when you type google.com?", "Why is TCP's
+handshake 3-way and not 2-way?", "Switch vs router?") I had to dig through five different places,
+and half the diagrams were ASCII art that made sense only when I drew them.
+
+The bigger problem: reading about CRC, subnetting or TCP congestion control never stuck.
+I'd understand it, then forget the details a week later.
+
+So I collected everything I could find (my own notes, textbook points, interview questions,
+GATE-style formulas) and turned it into one website where I can **read, play with and test
+myself on** every topic in one place.
+
+## What's inside
+
+- **21 chapters** covering the whole subject: basics, OSI/TCP-IP, Data Link, medium access,
+  error detection, IP/ARP/NAT, subnetting, routing, TCP/UDP, handshake, sliding window,
+  congestion control, termination, DNS/DHCP, HTTP, TLS, security, Wi-Fi, VPN, and the full
+  "type google.com" journey.
+- **51 interactive diagrams** instead of static pictures, for example:
+  - a switch that learns MAC addresses as you send frames
+  - CRC long division and Hamming code, every XOR step shown
+  - subnet calculator, VLSM and IP fragmentation
+  - TCP Tahoe vs Reno congestion window chart
+  - step-by-step sequence diagrams for the handshake, DNS, DHCP, ARP and TLS
+  - the whole google.com request animated hop by hop, with headers at each hop
+- **Quick sheet** for every chapter, for last-minute revision.
+- **212 flashcards and 146 quiz questions**, plus a Practice page that mixes them.
+- **Cheat sheet** with all port numbers, formulas, every "X vs Y" comparison and 60+ interview Q&As.
+- Search across all notes, Study/Quick mode, light and dark themes, progress tracking,
+  works offline and on phones.
+
+Anything I added beyond my original notes is marked with a **+ Added** tag, so I know what to
+double-check.
+
+## How I use it
+
+1. **First pass:** Study mode, read the chapter and play with the diagrams.
+2. **Lock it in:** flashcards, then the chapter quiz.
+3. **Night before:** Quick mode (opens every chapter on its one-page sheet) + the cheat sheet.
+4. **Random revision:** the Practice page gives a fresh 15-question mixed quiz each time.
+
+## Tech
+
+React + Vite, plain JavaScript, no backend. Progress and quiz scores are saved in the browser's
+localStorage. Deployed on GitHub Pages through GitHub Actions.
 
 ## Run it locally
 
-Requires Node.js 18 or newer.
+Needs Node.js 18 or newer.
 
 ```bash
+git clone https://github.com/i-amprince/CN_PREP.git
+cd CN_PREP
 npm install
-npm run dev          # http://localhost:5173 (hot reload)
+npm run dev          # http://localhost:5173
 ```
 
-Production build:
+Production build: `npm run build` (output in `dist/`), then `npm run preview`.
 
-```bash
-npm run build        # outputs to dist/
-npm run preview      # serves dist/ at http://localhost:4173
-```
-
-## Deploy for free
-
-The build is plain static files and uses hash routing (`#/ch/osi`), so it works on any
-static host without redirect rules.
-
-| Host | Steps |
-|---|---|
-| **Netlify Drop** (fastest) | Run `npm run build`, open https://app.netlify.com/drop and drag the `dist` folder onto the page. |
-| **Vercel** | Push the project to GitHub → vercel.com → *Add New Project* → import the repo. It detects Vite: build `npm run build`, output `dist`. |
-| **GitHub Pages** | Push to a GitHub repo (branch `main`). In *Settings → Pages* set **Source: GitHub Actions**. The included `.github/workflows/deploy.yml` builds and publishes on every push. |
-| **Cloudflare Pages** | Connect the repo; build command `npm run build`, output directory `dist`. |
-
-`vite.config.js` uses `base: './'`, so the site also works from a sub-path such as
-`username.github.io/repo-name/`.
-
-## Editing content
-
-- Chapter text lives in `content/*.html`, using the classes from the design system
-  (`.co.key`, `.co.trap`, `.co.added`, `.tbl`, `.vs`, `.tree`, `.flow`…).
-  `<div class="wg" data-wg="name"></div>` places an interactive widget.
-- After editing, run `npm run content`. It regenerates `src/chapters/*.jsx` (text kept
-  verbatim), the heading index and the full-text search index.
-- Flashcards and quizzes are in `src/data/qa/*.js`.
-- Widgets are in `src/widgets/`; their maths is in `src/lib/netmath.js`.
-
-## Checks
-
-```bash
-npm run verify       # widget maths: CRC, Hamming, fragmentation, checksum, LPM, subnetting, cwnd…
-npm run crosscheck   # every line of the original notes vs the site content
-```
-
-## Project layout
+## Project structure
 
 ```
-content/                 chapter HTML (source of truth for text)
-scripts/                 convert-chapters, verify-widgets, crosscheck
-src/chapters/            generated chapter components
-src/components/          layout, chapter page, flashcards, quiz, practice, search bar
-src/widgets/             interactive diagrams
-src/data/                chapters/units metadata, flashcards & quizzes, search indexes
-src/styles/design.css    design system from the handoff (tokens, components, themes)
-public/sw.js             offline cache
-packet-notes-handoff/    original handoff folder (reference only)
+content/          chapter notes as HTML (the source I edit)
+scripts/          converts notes to components, checks the maths, checks coverage of my notes
+src/chapters/     generated chapter components
+src/components/   layout, chapter page, flashcards, quiz, practice, search
+src/widgets/      interactive diagrams
+src/data/         chapter list, flashcards and quizzes
+src/lib/          networking maths (CRC, Hamming, subnetting, cwnd…)
 ```
 
-Progress (chapters done, best quiz scores), theme and Study/Quick mode are saved in your
-browser's localStorage.
+To edit a chapter, change its file in `content/` and run `npm run content`.
+`npm run verify` checks the calculators against known textbook answers, and
+`npm run crosscheck` makes sure every point from my original notes still appears on the site.
+
+## Contributing
+
+Found a mistake, or have an interview question that should be here? Open an issue or a PR.
+If this helps you prepare too, a ⭐ would be great.
