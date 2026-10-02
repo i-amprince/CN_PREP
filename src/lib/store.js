@@ -10,10 +10,10 @@ let state = {
   done: {},          // { [chapterId]: true }
   best: {},          // { [chapterId | 'practice']: { score, total, at } }
   mode: 'study',     // 'study' | 'quick'
-  theme: 'system',   // 'system' | 'light' | 'dark'
+  theme: 'dark',     // 'dark' | 'light'
   ...read(KEY, {}),
 };
-try { const t = localStorage.getItem('pn.theme'); if (t) state.theme = t; } catch { /* ignore */ }
+try { const t = localStorage.getItem('pn.theme'); state.theme = t === 'light' ? 'light' : 'dark'; } catch { /* ignore */ }
 
 const subs = new Set();
 function set(patch) {
@@ -41,8 +41,7 @@ export const actions = {
   },
   setMode(mode) { set({ mode }); },
   cycleTheme() {
-    const order = ['system', 'light', 'dark'];
-    const theme = order[(order.indexOf(state.theme) + 1) % 3];
+    const theme = state.theme === 'light' ? 'dark' : 'light';
     set({ theme });
     applyTheme(theme);
   },
@@ -51,8 +50,7 @@ export const actions = {
 
 export function applyTheme(theme = state.theme) {
   const el = document.documentElement;
-  if (theme === 'light' || theme === 'dark') el.setAttribute('data-theme', theme);
-  else el.removeAttribute('data-theme');
+  el.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
 }
 
 export const getState = () => state;

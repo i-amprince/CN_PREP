@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { actions, useStore } from '../lib/store.js';
 import { buildIndex, searchIndex, loadBodyIndex } from '../lib/search.js';
 
-const THEME_LABEL = { system: 'Theme: system (click for light)', light: 'Theme: light (click for dark)', dark: 'Theme: dark (click for system)' };
+const THEME_LABEL = { light: 'Switch to dark theme', dark: 'Switch to light theme' };
 
 function ThemeIcon({ theme }) {
   if (theme === 'light') return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>;

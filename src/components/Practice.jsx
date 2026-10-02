@@ -19,7 +19,7 @@ export default function Practice() {
   const [unit, setUnit] = useState('all');
   const [seed, setSeed] = useState(0);
   const best = useStore((s) => s.best.practice);
-  useEffect(() => { document.title = 'Practice · Packet Notes'; }, []);
+  useEffect(() => { document.title = 'Practice · CN Prep'; }, []);
 
   const cards = useMemo(() => shuffle(ALL_CARDS.filter((c) => unit === 'all' || String(CH_BY_ID[c[2]].unit) === unit)), [unit]);
   const quiz = useMemo(() => {

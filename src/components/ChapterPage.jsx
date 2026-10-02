@@ -67,7 +67,7 @@ export default function ChapterPage() {
   const hid = params.get('h');
   const cardIdx = Number(params.get('card') || 0);
 
-  useEffect(() => { if (ch) document.title = `${ch.short} · Packet Notes`; }, [ch]);
+  useEffect(() => { if (ch) document.title = `${ch.short} · CN Prep`; }, [ch]);
   useJumpTo(hid, [hid, id]);
 
   const parts = useMemo(() => (ch ? chapterParts(id) : null), [id, ch]);
